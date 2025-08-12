@@ -1,0 +1,7 @@
+Django
+djangorestframework
+djangorestframework-simplejwt
+stripe
+dotenv
+mysqlclient
+pillow
