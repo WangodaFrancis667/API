@@ -76,3 +76,70 @@ class User(AbstractUser):
     """
 
     email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=ROLES_DATA, db_index=True)
+
+    # Enhanced profile fields
+    profile_image = models.ImageField(upload_to="profiles/", null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True, null=True, db_index=True)
+    location = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    business_name = models.CharField(max_length=255, blank=True, null=True)
+
+    # Financial Fields
+    wallet = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        default=Decimal('0.00'), 
+        db_index=True
+    )
+    
+    referral_points = models.IntegerField(default=0, db_index=True)
+
+    # Security and verification fields
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', db_index=True)
+    email_verified = models.BooleanField(default=False)
+    phone_verified = models.BooleanField(default=False)
+    login_attempts = models.IntegerField(default=0)
+    account_locked_until = models.DateTimeField(null=True, blank=True)
+
+    objects = UserManager()
+
+    # creating indexes for faster lookups
+    class Meta:
+        indexes = [
+            models.Index(fields=['role']),  # Fast lookups by role
+            models.Index(fields=['username']),
+            models.Index(fields=['email']),  # Fast email lookups
+            models.Index(fields=['phone']),  # Fast phone lookups
+            models.Index(fields=['status']),  # Fast status filtering
+            models.Index(fields=['wallet']),  # Fast wallet queries
+            models.Index(fields=['role', 'status']),  # Composite index for common filters
+            models.Index(fields=['email_verified', 'phone_verified']),  # Verification status queries
+        ]
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.role})"
+    
+    def is_account_locked(self):
+        # Check if the account is currently locked
+        if self.account_locked_until:
+            return timezone.now() < self.account_locked_until
+        return False
+    
+    def lock_account(self, duration_minutes=30):
+        # Lock account for a specified durations
+        self.account_locked_until = timezone.now() + timezone.timedelta(minutes=duration_minutes)
+        self.save(update_fields=['account_locked_until'])
+
+    def unlock_account(self):
+        self.account_locked_until = None
+        self.login_attempts = 0
+        self.save(update_fields=['account_locked_until', 'login_attempts'])
+
+    def add_wallet_balance(self, amount):
+        # safely add to wallet balance
+        if amount > 0:
+            self.wallet += Decimal(str(amount))
+            self.save(update_fields=['wallet'])
+            return True
+        return False
+    
