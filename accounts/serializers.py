@@ -301,3 +301,72 @@ class UserProfileSerializer(serializers.ModelSerializer):
         cache.delete(cache_key)
         
         return super().update(instance, validated_data)
+    
+class PasswordChangeSerializer(serializers.ModelSerializer):
+    """
+    Serializer for password change with validation.
+    """
+
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    new_password_confirm = serializers.CharField(write_only=True)
+
+    def validate_old_password(self, value):
+        """Validate old password."""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Old password is incorrect.")
+        return value
+    
+    def validate(self, attrs):
+        """Cross-field validation."""
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({"new_password_confirm": "New passwords don't match."})
+        return attrs
+    
+    
+    def save(self):
+        """Change user password."""
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        
+        # Log password change
+        logger.info(f"Password changed for user: {user.username}")
+        
+        return user
+    
+class AdminUserManagementSerializer(serializers.ModelSerializer):
+    """
+    Serializer for admin user management operations.
+    """
+    
+    class Meta:
+        model = User
+        fields = (
+            'id', 'username', 'email', 'first_name', 'last_name', 
+            'phone', 'location', 'business_name', 'role', 'status',
+            'wallet', 'referral_points', 'email_verified', 'phone_verified',
+            'is_active', 'login_attempts', 'account_locked_until'
+        )
+        read_only_fields = ('id', 'username', 'wallet', 'referral_points')
+    
+    def validate_role(self, value):
+        """Validate role changes."""
+        if self.instance and self.instance.role != value:
+
+            # Log role changes
+            logger.warning(f"Role change attempted: {self.instance.username} from {self.instance.role} to {value}")
+        return value
+    
+
+class UserActivityLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for user activity logs.
+    """
+    user_display = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = UserActivityLog
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at')
