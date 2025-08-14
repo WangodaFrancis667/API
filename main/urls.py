@@ -1,5 +1,5 @@
 """
-URL configuration for core project.
+URL configuration for main project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.2/topics/http/urls/
@@ -15,8 +15,16 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from APIHealth.views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Health check
+    path('health/', health_check, name='health-check'),
+
+    path('api/auth/', include('accounts.urls')),
+    # Add this line for DRF browsable API login/logout
+    # path('api-auth/', include('rest_framework.urls')),
 ]
