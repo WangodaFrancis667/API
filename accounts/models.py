@@ -75,6 +75,13 @@ class User(AbstractUser):
         deduct_wallet_balance: Safely deducts from wallet balance (with validation).
     """
 
+    # Adding the full name field
+    full_name = models.CharField(max_length=255, blank=True)
+
+    # Make first_name and last_name optional since we're not using them
+    first_name = models.CharField(max_length=150, blank=True, null=True)
+    last_name = models.CharField(max_length=150, blank=True, null=True)
+
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=ROLES_DATA, db_index=True)
 
@@ -91,7 +98,7 @@ class User(AbstractUser):
         default=Decimal('0.00'), 
         db_index=True
     )
-    
+
     referral_points = models.IntegerField(default=0, db_index=True)
 
     # Security and verification fields
@@ -101,23 +108,34 @@ class User(AbstractUser):
     login_attempts = models.IntegerField(default=0)
     account_locked_until = models.DateTimeField(null=True, blank=True)
 
+    # Date and time objects
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     objects = UserManager()
 
     # creating indexes for faster lookups
     class Meta:
         indexes = [
-            models.Index(fields=['role']),  # Fast lookups by role
-            models.Index(fields=['username']),
-            models.Index(fields=['email']),  # Fast email lookups
-            models.Index(fields=['phone']),  # Fast phone lookups
-            models.Index(fields=['status']),  # Fast status filtering
-            models.Index(fields=['wallet']),  # Fast wallet queries
-            models.Index(fields=['role', 'status']),  # Composite index for common filters
-            models.Index(fields=['email_verified', 'phone_verified']),  # Verification status queries
+            models.Index(name='idx_user_role', fields=['role']),  # Fast lookups by role
+            models.Index(name='idx_user_username', fields=['username']),
+            models.Index(name='idx_user_email', fields=['email']),  # Fast email lookups
+            models.Index(name='idx_user_phone', fields=['phone']),  # Fast phone lookups
+            models.Index(name='idx_user_status', fields=['status']),  # Fast status filtering
+            models.Index(name='idx_user_wallet', fields=['wallet']),  # Fast wallet queries
+            models.Index(name='idx_user_role_status', fields=['role', 'status']),  # Composite index for common filters
+            models.Index(name='idx_user_verification', fields=['email_verified', 'phone_verified']),  # Verification status queries
         ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.role})"
+    
+    def save(self, *args, **kwargs):
+        # Clear first name and last name if full_name is provided
+        if self.full_name:
+            self.first_name = ""
+            self.last_name = ""
+        super().save(*args, **kwargs)
     
     def is_account_locked(self):
         # Check if the account is currently locked
@@ -143,3 +161,101 @@ class User(AbstractUser):
             return True
         return False
     
+# Creating enhanced profiles for the specific roles
+# Admin profile
+class AdminProfile(models.Model):
+    """
+    Extended profile for admin users with admin-specific functionality.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='admin_profile')
+    permissions = models.JSONField(default=dict, blank=True)  # Store admin permissions
+    department = models.CharField(max_length=100, blank=True, null=True)
+    
+    def __str__(self):
+        return f"AdminProfile: {self.user.username}"
+    
+
+# Creating profiles for specific users
+class VendorProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='vendor_profile')
+    business_type = models.CharField(max_length=100, blank=True, null=True)
+    business_registration_number = models.CharField(max_length=50, blank=True, null=True)
+    tax_id = models.CharField(max_length=50, blank=True, null=True)
+    bank_account_info = models.JSONField(default=dict, blank=True)  # Store bank details securely
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    is_verified_vendor = models.BooleanField(default=False)
+    verification_documents = models.JSONField(default=list, blank=True)  # Store document paths/info
+
+    # Creating indexes for faster lookkups
+    class Meta:
+        indexes = [
+            models.Index(name='idx_vendor_business_type', fields=['business_type']),
+            models.Index(name='idx_vendor_verified', fields=['is_verified_vendor']),
+        ]
+    
+    def __str__(self):
+        return f"Vendor: {self.user.username} - {self.user.business_name}"
+    
+
+class BuyerProfile(models.Model):
+    """
+    Enhanced buyer profile with delivery and preference information.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='buyer_profile')
+    delivery_address = models.TextField(blank=True, null=True)
+    secondary_phone = models.CharField(max_length=20, blank=True, null=True)
+    delivery_instructions = models.TextField(blank=True, null=True)
+    preferred_delivery_time = models.CharField(max_length=50, blank=True, null=True)
+    loyalty_tier = models.CharField(
+        max_length=20, 
+        choices=[('bronze', 'Bronze'), ('silver', 'Silver'), ('gold', 'Gold'), ('platinum', 'Platinum')],
+        default='bronze'
+    )
+    
+    class Meta:
+        indexes = [
+            models.Index(name='idx_buyer_loyalty', fields=['loyalty_tier']),
+        ]
+
+    def __str__(self):
+        return f"Buyer: {self.user.username}"
+    
+
+# Activity logging model
+class UserActivityLog(models.Model):
+    """
+    Track user activities and system events for audit purposes.
+    """
+    ACTION_CHOICES = [
+        ('LOGIN', 'Login'),
+        ('LOGOUT', 'Logout'),
+        ('PROFILE_UPDATE', 'Profile Update'),
+        ('PASSWORD_CHANGE', 'Password Change'),
+        ('WALLET_CREDIT', 'Wallet Credit'),
+        ('WALLET_DEBIT', 'Wallet Debit'),
+        ('ORDER_PLACED', 'Order Placed'),
+        ('ACCOUNT_LOCKED', 'Account Locked'),
+        ('ACCOUNT_UNLOCKED', 'Account Unlocked'),
+        ('EMAIL_VERIFIED', 'Email Verified'),
+        ('PHONE_VERIFIED', 'Phone Verified'),
+        ('OTHER', 'Other'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(name='idx_activity_user_created', fields=['user', 'created_at']),
+            models.Index(name='idx_activity_action_created', fields=['action', 'created_at']),
+            models.Index(name='idx_activity_created', fields=['created_at']),
+        ]
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.action} at {self.created_at}"
