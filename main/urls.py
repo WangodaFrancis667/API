@@ -16,12 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from APIHealth.views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('api/auth/', include('accounts.urls')),
+    # Health check
+    path('health/', health_check, name='health-check'),
 
+    path('api/auth/', include('accounts.urls')),
     # Add this line for DRF browsable API login/logout
-    path('api-auth/', include('rest_framework.urls')),
+    # path('api-auth/', include('rest_framework.urls')),
 ]
