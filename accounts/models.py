@@ -202,6 +202,9 @@ class BuyerProfile(models.Model):
     Enhanced buyer profile with delivery and preference information.
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='buyer_profile')
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    full_name = models.CharField(max_length=255, blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
     delivery_address = models.TextField(blank=True, null=True)
     secondary_phone = models.CharField(max_length=20, blank=True, null=True)
     delivery_instructions = models.TextField(blank=True, null=True)
