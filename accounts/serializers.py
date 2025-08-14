@@ -1,16 +1,19 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken
+from datetime import timezone
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
-from .models import User, AdminProfile, BuyerProfile, VendorProfile, UserActivityLog
+from .models import User, AdminProfile, BuyerProfile, VendorProfile, UserActivityLog, ArchiveUser
 import re
 import logging
+
 
 logger = logging.getLogger('accounts.security')
 
 
 # User Registration serializer
-class UserRegistrationSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(serializers.Serializer):
     """
        Serializer for user registration
     """
@@ -96,7 +99,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class VendorRegistrationSerializer(serializers.ModelSerializer):
+class VendorRegistrationSerializer(serializers.Serializer):
     """
     Serializer for vendor registration by admins only.
     """
@@ -174,12 +177,13 @@ class VendorRegistrationSerializer(serializers.ModelSerializer):
     
 
 
-class UserLoginSerializer(serializers.ModelSerializer):
+class UserLoginSerializer(serializers.Serializer):
     """
     Serializer for user login with security checks.
     """
-    phone = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+
+    phone = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, attrs):
         phone = attrs.get('phone')
@@ -191,31 +195,49 @@ class UserLoginSerializer(serializers.ModelSerializer):
         # try to get user by phone or email
         try:
             user = User.objects.get(phone=phone)
+
+            # Check if the account is locked
+            if user.is_account_locked():
+                raise serializers.ValidationError("Account is temporarily locked due to multiple failed login attempts.")
+            
+            # Check account status
+            if user.status != 'active':
+                raise serializers.ValidationError(f"Account is {user.status}. Please contact administrator.")
+        
+            
+            # Authenticate with phone and password
+            authenticated_user = authenticate(phone=phone, password=password)
+            if not authenticated_user:
+                self._handle_failed_login(phone)
+                raise serializers.ValidationError("Invalid credentials.")
+            
+            # Reset login attempts after successful login
+            if user.login_attempts > 0:
+                user.login_attempts = 0
+                user.save(update_fields=['login_attempts'])
+
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+    
+            return {
+                'user': {
+                'id': user.id,
+                'full_name': user.full_name,
+                'email': user.email,
+                'role': user.role,
+                'phone': user.phone if user.phone else None,
+                'location': user.location if user.location else None,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'profile_image': user.profile_image.url if user.profile_image else None,
+                },
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            }
+        
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid credentials.")
         
-        # Check if account is locked
-        if user.is_account_locked():
-            raise serializers.ValidationError("Account is temporarily locked due to multiple failed login attempts.")
-        
-        # Check ccount status
-        if user.status != 'active':
-            raise serializers.ValidationError(f"Account is {user.status}. Please contact administrator.")
-        
-        # Authenticate
-        user = authenticate(phone=phone, password=password)
-        if not user:
-            # Increment failed login attempts
-            self._handle_failed_login(phone)
-            raise serializers.ValidationError("Invalid credentials.")
-
-        # Reset login attemots after a successfull login
-        if user.login_attempts > 0:
-            user.login_attempts = 0
-            user.save(update_fields=['login_attempts'])
-
-        attrs['user'] = user
-        return attrs
     
     def _handle_failed_login(self, phone):
         """Handle failed login attempts with account locking."""
@@ -235,7 +257,149 @@ class UserLoginSerializer(serializers.ModelSerializer):
             pass  # Don't reveal if username exists
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
+class ProfileUpdateSerializer(serializers.Serializer):
+    """
+    Serializer for updating user profile information, including role-specific profile details.
+    Handles both User model fields and related profile model fields in a single update operation.
+    """
+    
+    # common fileds
+    full_name = serializers.CharField(required=False)
+    phone = serializers.CharField(required=False)
+    location = serializers.CharField(required=False)
+    profile_image = serializers.ImageField(required=False)
+
+    # Admin profile fields
+    department = serializers.CharField(required=False, allow_blank=True)
+
+    # Vendor profile fields
+    business_type = serializers.CharField(required=False, allow_blank=True)
+    business_registration_number = serializers.CharField(required=False, allow_blank=True)
+    tax_id = serializers.CharField(required=False, allow_blank=True)
+    bank_account_info = serializers.JSONField(required=False)
+
+     # Buyer profile fields
+    delivery_address = serializers.JSONField(required=False)
+    secondary_phone = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = (
+            'full_name', 'email', 'phone', 'location', 'business_name', 'profile_image',
+
+            # Admin fields
+            'department',
+
+            # Vendor fields
+            'business_type', 'business_registration_number', 'tax_id', 'bank_account_info',
+
+            # Buyer fields
+            'delivery_address', 'secondary_phone',
+        )
+
+    def validate_email(self, value):
+        """Validate email uniqueness excluding current user."""
+        if User.objects.filter(email=value.lower()).exclude(id=self.instance.id).exists():
+            raise serializers.ValidationError("A User with this email already exists!")
+        
+    
+    def validate_phone(self, value):
+        """Validate phone format and uniqueness."""
+        if value:
+            # Clean phone number
+            phone_clean = re.sub(r'[^\d+]', '', value)
+            if not re.match(r'^\+?[1-9]\d{8,14}$', phone_clean):
+                raise serializers.ValidationError('Please enter a valid phone number')
+            
+            # Check uniqueness
+            if User.objects.filter(phone=phone_clean).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError("A user with this phone number already exists.")
+            
+            return phone_clean
+        return value
+    
+    def validate(self, attrs):
+        # validate that only relevant profile fields are provided based on the user role
+        user = self.instance
+        role = user.role
+
+
+        # Check admin fields
+        admin_fields = ['department']
+        if role != 'admin' and any(field in attrs for field in admin_fields):
+            raise serializers.ValidationError("Admin profile fields can only be updated by admin users!")
+        
+        # Check vendorfields
+        vendor_fields = ['business_type', 'business_registration_number', 'tax_id', 'bank_account_info']
+        if role != 'vendor' and any(field in attrs for field in vendor_fields):
+            raise serializers.ValidationError("Vendor profile fields can only be updated by vendors only!")
+        
+        # Check buyer fields
+        buyer_fields = ['delivery_address', 'secondary_phone']
+        if role != 'buyer' and any(field in attrs for field in buyer_fields):
+            raise serializers.ValidationError("Buyer profile fields can only be updated by buyers only!")
+        
+        return attrs
+    
+    def update(self, instance, validated_data):
+        """Update both user model and related profile model."""
+        # Extract profile-specific data
+        admin_data = {}
+        vendor_data = {}
+        buyer_data = {}
+
+        # Admin profile fields
+        if 'department' in validated_data:
+             admin_data['department'] = validated_data.pop('department')
+
+        # Vendor profile fields
+        for field in ['business_type', 'business_registration_number', 'tax_id', 'bank_account_info']:
+            if field in validated_data:
+                vendor_data[field] = validated_data.pop(field)
+        
+        # Buyer profile fields
+        for field in ['delivery_address', 'secondary_phone']:
+            if field in validated_data:
+                buyer_data[field] = validated_data.pop(field)
+
+        # Update user model
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update role-specific profile
+        if instance.role == 'admin' and admin_data and hasattr(instance, 'admin_profile'):
+            admin_profile = instance.admin_profile
+            for attr, value in admin_data.items():
+                setattr(admin_profile, attr, value)
+            admin_profile.save()
+        
+        elif instance.role == 'vendor' and vendor_data and hasattr(instance, 'vendor_profile'):
+            vendor_profile = instance.vendor_profile
+            for attr, value in vendor_data.items():
+                setattr(vendor_profile, attr, value)
+            vendor_profile.save()
+        
+        elif instance.role == 'buyer' and buyer_data and hasattr(instance, 'buyer_profile'):
+            buyer_profile = instance.buyer_profile
+            for attr, value in buyer_data.items():
+                setattr(buyer_profile, attr, value)
+            buyer_profile.save()     
+
+        # Invalidate cache
+        cache_key = f"user_profile_{instance.id}"
+        cache.delete(cache_key)
+
+        # Log profile update
+        logger.info(f"Profile updated for user: {instance.username}")  
+
+        return instance     
+
+    
+
+
+
+class UserProfileSerializer(serializers.Serializer):
     """
     Serializer for user profile with role-specific information.
     """
@@ -302,7 +466,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         
         return super().update(instance, validated_data)
     
-class PasswordChangeSerializer(serializers.ModelSerializer):
+class PasswordChangeSerializer(serializers.Serializer):
     """
     Serializer for password change with validation.
     """
@@ -336,7 +500,7 @@ class PasswordChangeSerializer(serializers.ModelSerializer):
         
         return user
     
-class AdminUserManagementSerializer(serializers.ModelSerializer):
+class AdminUserManagementSerializer(serializers.Serializer):
     """
     Serializer for admin user management operations.
     """
@@ -360,7 +524,7 @@ class AdminUserManagementSerializer(serializers.ModelSerializer):
         return value
     
 
-class UserActivityLogSerializer(serializers.ModelSerializer):
+class UserActivityLogSerializer(serializers.Serializer):
     """
     Serializer for user activity logs.
     """
@@ -370,3 +534,55 @@ class UserActivityLogSerializer(serializers.ModelSerializer):
         model = UserActivityLog
         fields = '__all__'
         read_only_fields = ('id', 'created_at')
+
+
+# This enables users to delete their accounts
+class UserDeleteSerializer(serializers.Serializer):
+    """
+    Serializer for account deletion with password confirmation.
+    """
+    password = serializers.CharField(write_only=True, required=True)
+    delete_reason = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_password(self, value):
+        """Validate user's password before allowing account deletion."""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Password is incorrect.")
+        return value
+    
+    def save(self):
+        """
+        Handle the account deletion process.
+        - Log the deletion
+        - Archive user data if needed
+        - Delete the user account
+        """
+        user = self.context['request'].user
+        username = user.username
+        user_id = user.id
+        delete_reason = self.validated_data.get('delete_reason', '')
+        
+        # Log the account deletion
+        logger.warning(f"Account deletion: User {username} (ID: {user_id}) - Reason: {delete_reason}")
+        
+        
+        # Archive user date in the database
+        ArchiveUser.objects.create(
+            original_user_id=user.id,
+            username=user.username,
+            email=user.email,
+            phone=user.phone,
+            full_name=user.full_name,
+            role=user.role,
+            deleted_at=timezone.now(),
+            delete_reason=delete_reason,
+            account_created_at=user.date_joined,
+            last_login=user.last_login,
+            wallet_balance=user.wallet
+        )
+        
+        # Delete the user account
+        user.delete()
+        
+        return {'success': True, 'message': 'Your account has been successfully deleted.'}
