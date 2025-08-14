@@ -12,6 +12,16 @@ class CSRFExemptAPIMiddleware(MiddlewareMixin):
     Exempts all URLs starting with '/api/' from CSRF checks.
     """
 
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Allow browsable API to work properly
+        if request.method == 'GET' and 'text/html' in request.META.get('HTTP_ACCEPT', ''):
+            pass # continuew processing
+
+        return self.get_response(request)
+
     def process_view(self, request, view_func, view_args, view_kwargs):
         if request.path.startswith('/api/'):
             # For function-based views
