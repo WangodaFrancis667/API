@@ -209,19 +209,19 @@ class UserLoginSerializer(serializers.Serializer):
     Serializer for user login with security checks.
     """
 
-    phone = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, attrs):
-        phone = attrs.get('phone')
+        username = attrs.get('username')
         password = attrs.get('password')
 
-        if not phone or not password:
-            raise serializers.ValidationError('phone and password are required')
+        if not username or not password:
+            raise serializers.ValidationError('username and password are required')
         
         # try to get user by phone or email
         try:
-            user = User.objects.get(phone=phone)
+            user = User.objects.get(username=username)
 
             # Check if the account is locked
             if user.is_account_locked():
@@ -233,9 +233,9 @@ class UserLoginSerializer(serializers.Serializer):
         
             
             # Authenticate with phone and password
-            authenticated_user = authenticate(phone=phone, password=password)
+            authenticated_user = authenticate(username=username, password=password)
             if not authenticated_user:
-                self._handle_failed_login(phone)
+                self._handle_failed_login(username)
                 raise serializers.ValidationError("Invalid credentials.")
             
             # Reset login attempts after successful login
@@ -266,17 +266,17 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid credentials.")
         
     
-    def _handle_failed_login(self, phone):
+    def _handle_failed_login(self, username):
         """Handle failed login attempts with account locking."""
 
         try:
-            user = User.objects.get(phone=phone)
+            user = User.objects.get(username=username)
             user.login_attempts += 1
             
             # Lock account after 5 failed attempts
             if user.login_attempts >= 5:
                 user.lock_account(duration_minutes=30)
-                logger.warning(f"Account locked for user: {phone}")
+                logger.warning(f"Account locked for user: {username}")
             
             user.save(update_fields=['login_attempts'])
             
