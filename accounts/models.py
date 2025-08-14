@@ -259,3 +259,41 @@ class UserActivityLog(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.action} at {self.created_at}"
+    
+
+# Archive user model for storing user information upon deleting it
+class ArchiveUser(models.Model):
+    """
+    Stores data of deleted user accounts for record-keeping and analytics.
+    
+    This model preserves essential information about users who have deleted their accounts,
+    helping with analytics, compliance, and understanding user churn.
+    """
+
+    original_user_id = models.IntegerField(db_index=True)
+    username = models.CharField(max_length=250)
+    email =  models.EmailField()
+    full_name = models.CharField(max_length=255, blank=True, null=True)
+    phone =  models.CharField(max_length=20, blank=True, null=True)
+    role = models.CharField(max_length=20, choices=ROLES_DATA)
+
+    # Deletion information
+    deleted_at = models.DateTimeField(default=timezone.now)
+    delete_reason = models.TextField(blank=True)
+
+    # Optional: Additional data that may need to be preserved
+    account_created_at = models.DateTimeField(null=True, blank=True)
+    last_login = models.DateTimeField(null=True, blank=True)
+    wallet_balance = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(name='idx_archived_user_id', fields=['original_user_id']),
+            models.Index(name='idx_archived_deleted_at', fields=['deleted_at']),
+            models.Index(name='idx_archived_role', fields=['role']),
+        ]
+        verbose_name = "Archived User"
+        verbose_name_plural = "Archived Users"
+
+    def __str__(self):
+        return f"Archived: {self.full_name} ({self.email})"
