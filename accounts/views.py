@@ -8,6 +8,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.decorators import api_view
 
+from datetime import timezone, datetime
+
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.auth import get_user_model
@@ -21,6 +23,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
+from django.http import  JsonResponse
+from django.shortcuts import render
 
 import logging
 
@@ -725,3 +729,321 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                 )
                 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+# Admin vendor registration view
+class VendorRegistrationView(generics.GenericAPIView):
+    """
+    Vendor registration endpoint (Admin only).
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        """Create a new vendor user (Admin only)."""
+        serializer = VendorRegistrationSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    vendor_user = serializer.save()
+                    
+                    # Log vendor creation
+                    log_user_activity(
+                        request.user,
+                        'VENDOR_CREATED',
+                        f'Vendor account created: {vendor_user.username}',
+                        request,
+                        {'created_user_id': vendor_user.id}
+                    )
+                    
+                    return Response({
+                        'message': 'Vendor created successfully',
+                        'vendor': UserProfileSerializer(vendor_user).data
+                    }, status=status.HTTP_201_CREATED)
+                    
+            except Exception as e:
+                logger.error(f"Vendor creation error: {e}")
+                return Response(
+                    {"error": "Vendor creation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminUserManagementView(generics.ListCreateAPIView):
+    """
+    Admin endpoint for user management.
+    """
+    serializer_class = AdminUserManagementSerializer
+    permission_classes = [IsAuthenticated, CanManageUsers]
+    
+    def get_queryset(self):
+        """Get users with optional filtering."""
+        queryset = User.objects.select_related('admin_profile', 'vendor_profile', 'buyer_profile')
+        
+        # Filter by role
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+        
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Search
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(username__icontains=search) |
+                models.Q(email__icontains=search) |
+                models.Q(first_name__icontains=search) |
+                models.Q(last_name__icontains=search)
+            )
+        
+        return queryset.order_by('-date_joined')
+
+
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Admin endpoint for individual user management.
+    """
+    serializer_class = AdminUserManagementSerializer
+    permission_classes = [IsAuthenticated, CanManageUsers]
+    queryset = User.objects.all()
+    
+    def update(self, request, *args, **kwargs):
+        """Update user with logging and cache invalidation."""
+        user = self.get_object()
+        old_data = {
+            'role': user.role,
+            'status': user.status,
+            'is_active': user.is_active
+        }
+        
+        response = super().update(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            # Invalidate cache for updated user
+            invalidate_user_cache(user.id)
+            
+            # Log admin action
+            log_user_activity(
+                request.user,
+                'USER_UPDATED',
+                f'User {user.username} updated by admin',
+                request,
+                {
+                    'target_user_id': user.id,
+                    'old_data': old_data,
+                    'new_data': request.data
+                }
+            )
+        
+        return response
+    
+    def destroy(self, request, *args, **kwargs):
+        """Soft delete user instead of hard delete."""
+        user = self.get_object()
+        
+        # Soft delete - deactivate instead of delete
+        user.is_active = False
+        user.status = 'inactive'
+        user.save()
+        
+        # Invalidate cache
+        invalidate_user_cache(user.id)
+        
+        # Log admin action
+        log_user_activity(
+            request.user,
+            'USER_DEACTIVATED',
+            f'User {user.username} deactivated by admin',
+            request,
+            {'target_user_id': user.id}
+        )
+        
+        return Response(
+            {"message": "User deactivated successfully"}, 
+            status=status.HTTP_200_OK
+        )
+
+
+class VendorVerificationView(APIView):
+    """
+    Admin endpoint for vendor verification.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+    
+    def post(self, request, user_id):
+        """Verify or unverify a vendor."""
+        try:
+            user = User.objects.get(id=user_id, role='vendor')
+            vendor_profile = user.vendor_profile
+            
+            action = request.data.get('action')  # 'verify' or 'unverify'
+            
+            if action == 'verify':
+                vendor_profile.is_verified_vendor = True
+                user.status = 'active'
+                log_message = f'Vendor {user.username} verified'
+            elif action == 'unverify':
+                vendor_profile.is_verified_vendor = False
+                user.status = 'pending'
+                log_message = f'Vendor {user.username} unverified'
+            else:
+                return Response(
+                    {"error": "Invalid action. Use 'verify' or 'unverify'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            vendor_profile.save()
+            user.save()
+            
+            # Invalidate cache
+            invalidate_user_cache(user.id)
+            
+            # Log admin action
+            log_user_activity(
+                request.user,
+                'VENDOR_VERIFICATION',
+                log_message,
+                request,
+                {'target_user_id': user.id, 'action': action}
+            )
+            
+            return Response({
+                'message': log_message,
+                'vendor': UserProfileSerializer(user).data
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Vendor not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Vendor verification error: {e}")
+            return Response(
+                {"error": "Verification failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UserActivityLogView(generics.ListAPIView):
+    """
+    View user activity logs (Admin can see all, users can see their own).
+    """
+    serializer_class = UserActivityLogSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get activity logs based on user role."""
+        if self.request.user.role == 'admin':
+            queryset = UserActivityLog.objects.all()
+            
+            # Filter by user
+            user_id = self.request.query_params.get('user_id')
+            if user_id:
+                queryset = queryset.filter(user_id=user_id)
+            
+            # Filter by action
+            action = self.request.query_params.get('action')
+            if action:
+                queryset = queryset.filter(action=action)
+            
+        else:
+            # Users can only see their own logs
+            queryset = UserActivityLog.objects.filter(user=self.request.user)
+        
+        return queryset.order_by('-created_at')
+
+
+class DashboardStatsView(APIView):
+    """
+    Dashboard statistics with caching.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get dashboard statistics based on user role."""
+        user = request.user
+        cache_key = f"dashboard_stats_{user.role}_{user.id}"
+        
+        stats = cache.get(cache_key)
+        if stats is None:
+            if user.role == 'admin':
+                stats = self._get_admin_stats()
+            elif user.role == 'vendor':
+                stats = self._get_vendor_stats(user)
+            elif user.role == 'buyer':
+                stats = self._get_buyer_stats(user)
+            else:
+                stats = {}
+            
+            cache.set(cache_key, stats, 300)  # Cache for 5 minutes
+        
+        return Response(stats, status=status.HTTP_200_OK)
+    
+    def _get_admin_stats(self):
+        """Get admin dashboard statistics."""
+        return {
+            'total_users': User.objects.count(),
+            'active_users': User.objects.filter(status='active').count(),
+            'pending_users': User.objects.filter(status='pending').count(),
+            'total_admins': User.objects.filter(role='admin').count(),
+            'total_vendors': User.objects.filter(role='vendor').count(),
+            'verified_vendors': User.objects.filter(
+                role='vendor', 
+                vendor_profile__is_verified_vendor=True
+            ).count(),
+            'total_buyers': User.objects.filter(role='buyer').count(),
+            'recent_registrations': User.objects.filter(
+                date_joined__gte=timezone.now() - timezone.timedelta(days=7)
+            ).count()
+        }
+    
+    def _get_vendor_stats(self, user):
+        """Get vendor dashboard statistics."""
+        return {
+            'verification_status': getattr(user.vendor_profile, 'is_verified_vendor', False),
+            'wallet_balance': float(user.wallet),
+            'account_status': user.status,
+            'profile_completion': self._calculate_profile_completion(user)
+        }
+    
+    def _get_buyer_stats(self, user):
+        """Get buyer dashboard statistics."""
+        return {
+            'wallet_balance': float(user.wallet),
+            'referral_points': user.referral_points,
+            'loyalty_tier': getattr(user.buyer_profile, 'loyalty_tier', 'bronze'),
+            'account_status': user.status,
+            'profile_completion': self._calculate_profile_completion(user)
+        }
+    
+    def _calculate_profile_completion(self, user):
+        """Calculate profile completion percentage."""
+        fields = ['first_name', 'last_name', 'email', 'phone', 'location']
+        completed = sum(1 for field in fields if getattr(user, field))
+        return int((completed / len(fields)) * 100)
+
+   
+
+
+@csrf_exempt
+def user_permissions(request):
+    """
+    Get current user permissions.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+    
+    try:
+        permissions_data = get_cached_user_permissions(request.user)
+        return JsonResponse(permissions_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
