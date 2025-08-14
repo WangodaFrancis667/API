@@ -21,7 +21,7 @@ class UserRegistrationSerializer(serializers.Serializer):
     phone = serializers.CharField(required=True)
     location = serializers.CharField(required=True)
     password = serializers.CharField(write_only=True, validators=[validate_password])
-    password_confirm = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
@@ -73,21 +73,49 @@ class UserRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError('The passwords donont match')
         
         # remove password confirmation from the validated data
-        attrs.pop['confirm_password']
+        attrs.pop('confirm_password')
         return attrs
     
     def create(self, validated_data):
         # create user with encrypted data and default profile
-        user = User.objects.create_user(**validated_data)
+        # user = User.objects.create_user(**validated_data)
+
+        # Generate username from phone if not provided
+        if 'username' not in validated_data or not validated_data['username']:
+            # use phone number as username ensuring uniqueness
+            base_username = validated_data.get('phone')
+            username = base_username
+
+            # Check if username exists and make it unique if needed
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
+            
+            validated_data['username'] = username
+
+            # Ensure role is set to 'buyer' for public registration
+            validated_data['role'] = 'buyer'
+
+        # Create user with encrypted password
+        password = validated_data.pop('password')
+        user = User.objects.create_user(
+            password=password,
+            **validated_data
+        )
+
 
         # create profile based on the user
-        if User.role == 'buyer':
-            BuyerProfile.objects.create(user=user)
-
-            # Log Buyer registration
+        if user.role == 'buyer':  # Changed from User.role to user.role
+            BuyerProfile.objects.create(
+            user=user,
+            phone=user.phone,
+            full_name=user.full_name,
+            location=user.location
+            )
             logger.info(f"New user registered: {user.username} ({user.role})")
-        
-        elif User.role == 'admin':
+
+        elif user.role == 'admin':  # Changed from User.role to user.role
             AdminProfile.objects.create(user=user)
 
             # Log Admin registration
@@ -175,7 +203,6 @@ class VendorRegistrationSerializer(serializers.Serializer):
 
         return user
     
-
 
 class UserLoginSerializer(serializers.Serializer):
     """
@@ -396,9 +423,6 @@ class ProfileUpdateSerializer(serializers.Serializer):
         return instance     
 
     
-
-
-
 class UserProfileSerializer(serializers.Serializer):
     """
     Serializer for user profile with role-specific information.
@@ -465,7 +489,8 @@ class UserProfileSerializer(serializers.Serializer):
         cache.delete(cache_key)
         
         return super().update(instance, validated_data)
-    
+
+
 class PasswordChangeSerializer(serializers.Serializer):
     """
     Serializer for password change with validation.
@@ -499,6 +524,7 @@ class PasswordChangeSerializer(serializers.Serializer):
         logger.info(f"Password changed for user: {user.username}")
         
         return user
+  
     
 class AdminUserManagementSerializer(serializers.Serializer):
     """
@@ -586,3 +612,91 @@ class UserDeleteSerializer(serializers.Serializer):
         user.delete()
         
         return {'success': True, 'message': 'Your account has been successfully deleted.'}
+    
+
+# # Add these serializers to your serializers.py file
+# class PasswordResetRequestSerializer(serializers.Serializer):
+#     """Serializer for requesting a password reset"""
+#     email = serializers.EmailField(required=True)
+    
+#     def validate_email(self, value):
+#         """Validate that a user exists with this email"""
+#         if not User.objects.filter(email=value.lower()).exists():
+#             # We don't reveal whether the email exists for security reasons
+#             # Just return the email and handle in the view
+#             pass
+#         return value.lower()
+
+
+# class PasswordResetConfirmSerializer(serializers.Serializer):
+#     """Serializer for confirming a password reset"""
+#     token = serializers.CharField(required=True)
+#     uidb64 = serializers.CharField(required=True)
+#     password = serializers.CharField(write_only=True, validators=[validate_password])
+#     confirm_password = serializers.CharField(write_only=True)
+    
+#     def validate(self, attrs):
+#         """Validate token and passwords match"""
+#         if attrs['password'] != attrs['confirm_password']:
+#             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        
+#         # Token validation will be done in the view
+#         return attrs
+
+# Add these serializers after your existing ones
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """
+    Serializer for requesting a password reset through email or phone.
+    """
+    email_or_phone = serializers.CharField(required=True)
+    
+    def validate(self, attrs):
+        email_or_phone = attrs.get('email_or_phone')
+        
+        # Check if input is email or phone
+        if '@' in email_or_phone:
+            # Looks like an email
+            if not User.objects.filter(email=email_or_phone.lower()).exists():
+                # We don't reveal whether the email exists for security reasons
+                # Just return without error and handle in view
+                pass
+            attrs['is_email'] = True
+        else:
+            # Looks like a phone number
+            # Clean phone number
+            phone_clean = re.sub(r'[^\d+]', '', email_or_phone)
+            if not User.objects.filter(phone=phone_clean).exists():
+                # We don't reveal whether the phone exists for security reasons
+                # Just return without error and handle in view
+                pass
+            attrs['is_email'] = False
+            attrs['email_or_phone'] = phone_clean
+            
+        return attrs
+
+
+class PasswordResetVerifySerializer(serializers.Serializer):
+    """
+    Serializer for verifying a password reset token.
+    """
+    token = serializers.CharField(required=True)
+    uidb64 = serializers.CharField(required=True)
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """
+    Serializer for confirming a password reset with a new password.
+    """
+    token = serializers.CharField(required=True)
+    uidb64 = serializers.CharField(required=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    new_password_confirm = serializers.CharField(write_only=True)
+    
+    def validate(self, attrs):
+        """Validate passwords match."""
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match."})
+        
+        # Token validation will be done in the view
+        return attrs
