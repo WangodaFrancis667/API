@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.utils import timezone
 from django.conf import settings
@@ -50,6 +50,15 @@ class EmailVerification(models.Model):
             models.Index(fields=['user', 'verified']),
         ]
 
+        constraints = [
+            # Only one active (unverified, not expired) code per user + email
+            models.UniqueConstraint(
+                fields=['user', 'email', 'verified'],
+                name='uniq_active_verification_per_user_email',
+                condition=models.Q(verified=False),
+            )
+        ]
+
         verbose_name = "Email Verification"
         verbose_name_plural = "Email Verifications"
     
@@ -57,32 +66,57 @@ class EmailVerification(models.Model):
         return f"{self.email} ({'Verified' if self.verified else 'Pending'})"
     
     @staticmethod
-    def generate_code():
+    def generate_code() -> str:
         # Generating a six digit code
         return f"{secrets.randbelow(999999):06}"
     
     @classmethod
-    def create_verification(cls, user, email, user_type, validity_minutes=10):
+    def create_fresh(cls, *, user, email, user_type, validity_minutes=10):
+        # create a fresh verification, expires any previous then creates a new one
+        with transaction.atomic():
+            cls.objects.filter(user=user, email=email, verified=False).update(
+                expires_at=timezone.now() - timedelta(seconds=1)
+            )
+            return cls.objects.create(
+                user=user,
+                email=email,
+                user_type=user_type,
+                verification_code=cls.generate_code(),
+                expires_at=timezone.now() + timedelta(minutes=validity_minutes),
+            )
+
         # create and return a new Email Verification instance
-        code = cls.generate_code()
-        expires = timezone.now() + timedelta(minutes=validity_minutes)
-        return cls.objects.create(
-            user=user,
-            email=email,
-            user_type=user,
-            verification_code=code,
-            expires_at=expires,
-        )
+        # code = cls.generate_code()
+        # expires = timezone.now() + timedelta(minutes=validity_minutes)
+        # return cls.objects.create(
+        #     user=user,
+        #     email=email,
+        #     user_type=user,
+        #     verification_code=code,
+        #     expires_at=expires,
+        # )
     
     def mark_verified(self):
         # Mark email as verified and update the user's email status
+
+        if self.verified:
+            return
+        
         self.verified = True
         self.verified_at = timezone.now()
         self.save(update_fields=['verified', 'verified_at'])
 
-        # Update the user model
+        # Flip user flag
         self.user.email_verified = True
-        self.user.save(update_fields=['email_verified'])
+
+        # persist the verified address on the user if that's your policy:
+        if not self.user.email:
+            self.user.email = self.email
+        self.user.save(update_fields=['email_verified', 'email'])
+
+        # Update the user model
+        # self.user.email_verified = True
+        # self.user.save(update_fields=['email_verified'])
 
 # User management model
 class UserManager(DjangoUserManager):
