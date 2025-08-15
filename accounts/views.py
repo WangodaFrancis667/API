@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.decorators import api_view
 
-from datetime import timezone, datetime
+from django.utils import timezone
 
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -43,6 +43,7 @@ from .serializers import (
     UserProfileSerializer, PasswordChangeSerializer,
     AdminUserManagementSerializer, UserActivityLogSerializer,
     SendEmailVerificationSerializer, ConfirmEmailVerificationSerializer,
+    AddEmailSerializer,
    
 
     PasswordResetRequestSerializer, 
@@ -894,12 +895,14 @@ class SendEmailVerificationView(generics.GenericAPIView):
             return Response({"detail": "Please wait before requesting another code."},
                             status=status.HTTP_429_TOO_MANY_REQUESTS)
         
-        verification = EmailVerification.create_fresh(
-            user=request.user,
-            email=email,
-            user_type=user_type,
-            validity_minutes=10,
-        )
+        # verification = EmailVerification.create_fresh(
+        #     user=request.user,
+        #     email=email,
+        #     user_type=user_type,
+        #     validity_minutes=10,
+        # )
+
+        verification = serializer.save()
 
         # enqueue async email
         send_verification_email_task.delay(verification.id)
@@ -933,13 +936,29 @@ class SendEmailVerificationView(generics.GenericAPIView):
         #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
 
-# Password Confirmation
+# Email Confirmation
 class ConfirmEmailVerificationView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = ConfirmEmailVerificationSerializer(data=request.data)
+        serializer = ConfirmEmailVerificationSerializer(data=request.data, context={'request': request})
+        # serializer = ConfirmEmailVerificationSerializer(data=request.data)
+
+        with transaction.atomic():
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        return Response({"detail": "Email successfully verified."}, status=status.HTTP_200_OK)
+
+
+# Add email view for users for 2 FA
+class AddEmailView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddEmailSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Email successfully verified."}, status=status.HTTP_200_OK)
+        return Response({"detail": "Email added successfully. Now send verification."}, status=status.HTTP_200_OK)
     
+
