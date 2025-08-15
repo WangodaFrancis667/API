@@ -9,7 +9,7 @@ from .views import (
     AdminUserManagementView, AdminUserDetailView, 
     VendorVerificationView, UserActivityLogView,
     DashboardStatsView, SendEmailVerificationView,
-    ConfirmEmailVerificationView,
+    ConfirmEmailVerificationView, AddEmailView,
 
 
     )
@@ -45,6 +45,7 @@ urlpatterns = [
     
 
     # Email verification endpoints
+    path('add-email/', AddEmailView.as_view(), name='add-email'),
     path('email/send/', SendEmailVerificationView.as_view(), name='send-email-verification'),
     path('email/confirm/', ConfirmEmailVerificationView.as_view(), name='confirm-email-verification'),
     
