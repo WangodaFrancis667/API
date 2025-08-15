@@ -29,16 +29,20 @@ from django.shortcuts import render
 
 import logging
 
-from .utils import mailer
+from .utils.utils import mailer
 
-from .models import User, AdminProfile, BuyerProfile, VendorProfile, UserActivityLog, ArchiveUser
+from .models import (
+    User, AdminProfile, BuyerProfile, VendorProfile, 
+    UserActivityLog, ArchiveUser, EmailVerification
+    )
+
 from .serializers import (
     UserDeleteSerializer, ProfileUpdateSerializer, 
     UserRegistrationSerializer, VendorRegistrationSerializer,
     UserLoginSerializer, ProfileUpdateSerializer,
     UserProfileSerializer, PasswordChangeSerializer,
     AdminUserManagementSerializer, UserActivityLogSerializer,
-    EmailVerificationSendSerializer, EmailVerificationConfirmSerializer,
+    SendEmailVerificationSerializer, ConfirmEmailVerificationSerializer,
    
 
     PasswordResetRequestSerializer, 
@@ -58,6 +62,11 @@ from .security import (
     invalidate_user_cache, check_rate_limit, is_suspicious_activity,
     get_user_dashboard_url
 )
+
+from .tasks import send_verification_email_task
+
+# One email per minute per user + email
+RATE_LIMIT_SECONDS = 60 
 
 logger = logging.getLogger('accounts.security')
 User = get_user_model()
@@ -873,27 +882,55 @@ class SendEmailVerificationView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = EmailVerificationSendSerializer(data=request.data, context={'request': request})
+        serializer = SendEmailVerificationSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
-        verification = serializer.save()
 
-        # send email
-        subject = "Your Email Verification Code"
-        html_message = render_to_string('emails/verification_email.html', {
-            'code': verification.verification_code,
-            'user': request.user,
-            'expires_at': verification.expires_at
-        })
+        email = serializer.validated_data['email'].lower()
+        user_type = serializer.validated_data['user_type']
 
-        result = mailer.send(
-            to=request.user.email,
-            subject=subject,
-            html=html_message,
+        # Throttle key
+        key = f"email_verif_rl:{request.user.id}:{email}"
+        if cache.get(key):
+            return Response({"detail": "Please wait before requesting another code."},
+                            status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        verification = EmailVerification.create_fresh(
+            user=request.user,
+            email=email,
+            user_type=user_type,
+            validity_minutes=10,
         )
-        if result:
-            return Response({"message": result}, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # enqueue async email
+        send_verification_email_task.delay(verification.id)
+
+        # set throttle window
+        cache.set(key, 1, timeout=RATE_LIMIT_SECONDS)
+
+        return Response({"detail": "Verification code sent to your email."}, status=status.HTTP_200_OK)
+
+
+        # serializer = SendEmailVerificationSerializer(data=request.data, context={'request': request})
+        # serializer.is_valid(raise_exception=True)
+        # verification = serializer.save()
+
+        # # send email
+        # subject = "Your Email Verification Code"
+        # html_message = render_to_string('emails/verification_email.html', {
+        #     'code': verification.verification_code,
+        #     'user': request.user,
+        #     'expires_at': verification.expires_at
+        # })
+
+        # result = mailer.send(
+        #     to=request.user.email,
+        #     subject=subject,
+        #     html=html_message,
+        # )
+        # if result:
+        #     return Response({"message": result}, status=status.HTTP_200_OK)
+        # else:
+        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
 
 # Password Confirmation
@@ -901,7 +938,8 @@ class ConfirmEmailVerificationView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = EmailVerificationConfirmSerializer(data=request.data)
+        serializer = ConfirmEmailVerificationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Email successfully verified."}, status=status.HTTP_200_OK)
+    
