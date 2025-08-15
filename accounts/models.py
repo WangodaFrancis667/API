@@ -1,7 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.utils import timezone
+from django.conf import settings
 from decimal import Decimal
+from datetime import timedelta
+
+
+import secrets
+
 
 # User roles
 ROLES_DATA = (
@@ -18,6 +24,67 @@ STATUS_CHOICES = (
     ('pending', 'Pending'),
 )
 
+
+class EmailVerification(models.Model):
+    USER_TYPES = (
+        ('buyer', 'Buyer'),
+        ('vendor', 'Vendor'),
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='email_verifications'
+    )
+
+    user_type = models.CharField(max_length=10, choices=USER_TYPES, db_index=True)
+    email = models.EmailField(max_length=255, db_index=True)
+    verification_code = models.CharField(max_length=6, db_index=True)
+    expires_at = models.DateTimeField()
+    verified = models.BooleanField(default=False)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['email', 'verification_code']),
+            models.Index(fields=['user', 'verified']),
+        ]
+
+        verbose_name = "Email Verification"
+        verbose_name_plural = "Email Verifications"
+    
+    def __str__(self):
+        return f"{self.email} ({'Verified' if self.verified else 'Pending'})"
+    
+    @staticmethod
+    def generate_code():
+        # Generating a six digit code
+        return f"{secrets.randbelow(999999):06}"
+    
+    @classmethod
+    def create_verification(cls, user, email, user_type, validity_minutes=10):
+        # create and return a new Email Verification instance
+        code = cls.generate_code()
+        expires = timezone.now() + timedelta(minutes=validity_minutes)
+        return cls.objects.create(
+            user=user,
+            email=email,
+            user_type=user,
+            verification_code=code,
+            expires_at=expires,
+        )
+    
+    def mark_verified(self):
+        # Mark email as verified and update the user's email status
+        self.verified = True
+        self.verified_at = timezone.now()
+        self.save(update_fields=['verified', 'verified_at'])
+
+        # Update the user model
+        self.user.email_verified = True
+        self.user.save(update_fields=['email_verified'])
+
+# User management model
 class UserManager(DjangoUserManager):
     """
     Custom manager for the User model, extending Django's built-in UserManager.
