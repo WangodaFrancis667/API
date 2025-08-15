@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.template.defaultfilters import date as date_filter
 
 from .models import EmailVerification
-from .utils import mailer
+from .utils.utils import mailer
 
 import logging
 
