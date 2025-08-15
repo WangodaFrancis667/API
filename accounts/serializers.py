@@ -675,7 +675,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 # Email sending verification
-class EmailVerificationSendSerializer(serializers.Serializer):
+class SendEmailVerificationSerializer(serializers.Serializer):
     """
     Serializer for sending email verification.
 
@@ -694,6 +694,18 @@ class EmailVerificationSendSerializer(serializers.Serializer):
     email = serializers.EmailField()
     user_type = serializers.ChoiceField(choices=EmailVerification.USER_TYPES)
 
+    def validate(self, attrs):
+        request = self.context['request']
+        user = request.user
+
+        # making sure the email and user match
+        if user.email and user.email.lower() != attrs['email'].lower():
+            raise serializers.ValidationError("Email doesn't match the one on file.")
+
+        if user.email_verified:
+            raise serializers.ValidationError("Email already verified.")
+        return attrs
+
     def create(self, validated_data):
         user = self.context['request'].user
         verification = EmailVerification.create_verification(
@@ -706,7 +718,7 @@ class EmailVerificationSendSerializer(serializers.Serializer):
     
 
 # Email confirmation 
-class EmailVerificationConfirmSerializer(serializers.Serializer):
+class ConfirmEmailVerificationSerializer(serializers.Serializer):
     """
     Serializer for confirming email verification codes.
 
@@ -725,37 +737,60 @@ class EmailVerificationConfirmSerializer(serializers.Serializer):
             Returns the verification instance.
     """
     email = serializers.EmailField()
-    verification_code = serializers.CharField(max_length=6)
+    verification_code = serializers.CharField(min_length=6, max_length=6)
 
     def validate(self, attrs):
-        """
-        Validate the email and verification code.
+        email=attrs['email'].lower()
+        code=attrs['verification_code']
+        user = self.context['request'].user
 
-        Raises:
-            ValidationError: If the code is invalid or expired.
-        """
         try:
-            verification = EmailVerification.objects.get(
-                email=attrs['email'],
-                verification_code=attrs['verification_code'],
-                verified=False
-            )
+            ver = (EmailVerification.objects
+                   .select_for_update()
+                   .get(user=user, email=email, verification_code=code, verified=False))
         except EmailVerification.DoesNotExist:
-            raise serializers.ValidationError("Invalid verification code.")
+            raise serializers.ValidationError("Invalid code or email.")
         
-        if verification.expires_at < timezone.now():
+        if ver.expires_at < timezone.now():
             raise serializers.ValidationError("Verification code has expired.")
-        
-        attrs['verification'] = verification
+        attrs['verification'] = ver
         return attrs
     
-    def save(self):
-        """
-        Mark the email verification as verified.
+    def save(self, **kwargs):
+        ver: EmailVerification = self.validated_data['verification']
+        ver.mark_verified()
+        return ver
 
-        Returns:
-            EmailVerification: The verified instance.
-        """
-        verification = self.validated_data['verification']
-        verification.mark_verified()
-        return verification
+
+    # def validate(self, attrs):
+    #     """
+    #     Validate the email and verification code.
+
+    #     Raises:
+    #         ValidationError: If the code is invalid or expired.
+    #     """
+    #     try:
+    #         verification = EmailVerification.objects.get(
+    #             email=attrs['email'],
+    #             verification_code=attrs['verification_code'],
+    #             verified=False
+    #         )
+    #     except EmailVerification.DoesNotExist:
+    #         raise serializers.ValidationError("Invalid verification code.")
+        
+    #     if verification.expires_at < timezone.now():
+    #         raise serializers.ValidationError("Verification code has expired.")
+        
+    #     attrs['verification'] = verification
+    #     return attrs
+    
+    # def save(self):
+    #     """
+    #     Mark the email verification as verified.
+
+    #     Returns:
+    #         EmailVerification: The verified instance.
+    #     """
+    #     verification = self.validated_data['verification']
+    #     verification.mark_verified()
+    #     return verification
