@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Email Verification</title>
+</head>
+<body style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 6px;">
+        <h2>Hello {{ user.full_name|default:user.username }},</h2>
+        <p>Your verification code is:</p>
+        <h1 style="color: #28a745; text-align: center;">{{ code }}</h1>
+        <p>This code will expire at <strong>{{ expires_at }}</strong>.</p>
+        <p>If you did not request this, please ignore this email.</p>
+        <p>Thank you,<br>The {{ site_name|default:"Our App" }} Team</p>
+    </div>
+</body>
+</html>
