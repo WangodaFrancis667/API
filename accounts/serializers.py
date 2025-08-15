@@ -1,15 +1,41 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from datetime import timezone
+from datetime import timedelta
+
+from django.db import transaction
+from django.utils import timezone
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
-from .models import User, AdminProfile, BuyerProfile, VendorProfile, UserActivityLog, ArchiveUser, EmailVerification
+
+from .models import (
+    User, AdminProfile, BuyerProfile, VendorProfile,
+    UserActivityLog, ArchiveUser, EmailVerification
+)
+
 import re
 import logging
 
 
 logger = logging.getLogger('accounts.security')
+
+
+# Serializer for adding an email
+class AddEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email=value).exists(): #or User.objects.filter(secondary_email=value).exists():
+            raise serializers.ValidationError("This email is already in use.")
+        return value
+
+    def save(self, **kwargs):
+        user = self.context['request'].user
+        user.email = self.validated_data['email'].lower()
+        user.email_verified = False
+        user.save(update_fields=['email', 'email_verified'])
+        return user
 
 
 # User Registration serializer
@@ -698,21 +724,52 @@ class SendEmailVerificationSerializer(serializers.Serializer):
         request = self.context['request']
         user = request.user
 
+        # Checking if the user has an attached email
+        if not user.email:
+            raise serializers.ValidationError("No email found. Please add one first.")
+        
         # making sure the email and user match
         if user.email and user.email.lower() != attrs['email'].lower():
             raise serializers.ValidationError("Email doesn't match the one on file.")
-
+        
+        # Checking if the email is already verified
         if user.email_verified:
             raise serializers.ValidationError("Email already verified.")
+        
+        # if User.objects.filter(email=attrs['email'].lower()).exists(): #or User.objects.filter(secondary_email=value).exists():
+        #     raise serializers.ValidationError("This email is already in use.")
+
+        
         return attrs
 
     def create(self, validated_data):
         user = self.context['request'].user
-        verification = EmailVerification.create_verification(
+        email = validated_data['email'].lower()
+
+        # Wrapping this under a transaction
+        with transaction.atomic():
+            # Deleting unverified or expired codes for the current user and email
+            verification, created = EmailVerification.objects.update_or_create(
             user=user,
-            email=validated_data['email'],
-            user_type=validated_data['user_type'],
+            email=email,
+            verified=False,
+            defaults={
+                'user_type': validated_data['user_type'],
+                'verification_code': EmailVerification.generate_code(),  # or however you generate it
+                'expires_at': timezone.now() + timedelta(minutes=10),
+            }
         )
+            # EmailVerification.objects.filter(
+            #     user=user,
+            #     email=email,
+            #     verified=False
+            # ).delete()
+    
+            # verification = EmailVerification.create_verification(
+            #     user=user,
+            #     email=validated_data['email'],
+            #     user_type=validated_data['user_type'],
+            # )
 
         return verification
     
@@ -760,37 +817,3 @@ class ConfirmEmailVerificationSerializer(serializers.Serializer):
         ver: EmailVerification = self.validated_data['verification']
         ver.mark_verified()
         return ver
-
-
-    # def validate(self, attrs):
-    #     """
-    #     Validate the email and verification code.
-
-    #     Raises:
-    #         ValidationError: If the code is invalid or expired.
-    #     """
-    #     try:
-    #         verification = EmailVerification.objects.get(
-    #             email=attrs['email'],
-    #             verification_code=attrs['verification_code'],
-    #             verified=False
-    #         )
-    #     except EmailVerification.DoesNotExist:
-    #         raise serializers.ValidationError("Invalid verification code.")
-        
-    #     if verification.expires_at < timezone.now():
-    #         raise serializers.ValidationError("Verification code has expired.")
-        
-    #     attrs['verification'] = verification
-    #     return attrs
-    
-    # def save(self):
-    #     """
-    #     Mark the email verification as verified.
-
-    #     Returns:
-    #         EmailVerification: The verified instance.
-    #     """
-    #     verification = self.validated_data['verification']
-    #     verification.mark_verified()
-    #     return verification
