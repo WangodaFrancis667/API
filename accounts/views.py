@@ -868,4 +868,40 @@ def user_permissions(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+# Send email verification view
+class SendEmailVerificationView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        serializer = EmailVerificationSendSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        verification = serializer.save()
+
+        # send email
+        subject = "Your Email Verification Code"
+        html_message = render_to_string('emails/verification_email.html', {
+            'code': verification.verification_code,
+            'user': request.user,
+            'expires_at': verification.expires_at
+        })
+
+        result = mailer.send(
+            to=request.user.email,
+            subject=subject,
+            html=html_message,
+        )
+        if result:
+            return Response({"message": result}, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+
+# Password Confirmation
+class ConfirmEmailVerificationView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = EmailVerificationConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Email successfully verified."}, status=status.HTTP_200_OK)
