@@ -93,6 +93,7 @@ WSGI_APPLICATION = 'main.wsgi.application'
 # Frontend URL for password reset links
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 SITE_NAME = os.environ.get('SITE_NAME', 'Your App Name')
+APP_NAME = 'AfroBuy'
 
 DATABASES = {
     'default': {
@@ -109,10 +110,13 @@ DATABASES = {
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True' # True for 587
+EMAIL_USE_SSL = False        # True for 465
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
+SUPPORT_EMAIL = 'info@afrobuyug.com'
+VERIFICATION_BCC = []        # optional list of emails to BCC
 
 
 
@@ -163,7 +167,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-APP_NAME = 'AfroBuy'
+
 
 AUTH_USER_MODEL='accounts.User'
 
@@ -212,14 +216,25 @@ CACHES = {
     }
 }
 
-# Use dummy cache for testing when Redis is not available
-import sys
-if 'test' in sys.argv or 'pytest' in sys.modules:
-    CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
-        }
-    }
+# Celery (Redis broker & backend)
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/2"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/3"
+CELERY_TASK_ALWAYS_EAGER = False  # make True for local debugging if you want sync behavior
+CELERY_TASK_TIME_LIMIT = 60
+CELERY_TASK_SOFT_TIME_LIMIT = 45
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "Africa/Kampala"
+
+# # Use dummy cache for testing when Redis is not available
+# import sys
+# if 'test' in sys.argv or 'pytest' in sys.modules:
+#     CACHES = {
+#         'default': {
+#             'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+#         }
+#     }
 
 # Security Settings
 SECURE_BROWSER_XSS_FILTER = True
