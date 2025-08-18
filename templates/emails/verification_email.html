@@ -12,7 +12,7 @@
         <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:8px;overflow:hidden;">
           <tr>
             <td style="background:#28a745;color:#ffffff;padding:16px 24px;font-size:18px;">
-              {{ site_name|default:"Our App" }}
+              {{ site_name|default:"AfroBuy Uganda" }}
             </td>
           </tr>
           <tr>
@@ -26,12 +26,25 @@
               </p>
               <p style="margin:0 0 4px;">This code expires at <strong>{{ expires_at }}</strong>.</p>
               <p style="margin:0 0 12px;color:#6c757d;">If you didn’t request this, you can safely ignore this email.</p>
-              <p style="margin:24px 0 0;">— The {{ site_name|default:"Our App" }} Team</p>
+              <p style="margin:24px 0 0;">`The {{ site_name|default:"Our App" }} Team</p>
             </td>
           </tr>
           <tr>
-            <td style="background:#f0f3f7;color:#6c757d;padding:12px 24px;font-size:12px;text-align:center;">
-              Need help? Contact {{ support_email }}
+            <td style="background:#f0f3f7;color:#6c757d;padding:16px 24px;font-size:12px;text-align:center;vertical-align:middle;">
+              <div style="margin-bottom:8px;text-align:center;">
+              This is an automated message. Please do not reply to this email.
+              </div>
+              <div style="margin-bottom:4px;text-align:center;">
+              Need help?
+              </div>
+              <div style="display:inline-flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px;text-align:center;">
+              <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/maildotru.svg" alt="Email" width="16" height="16" style="vertical-align:middle;">
+              <span>Contact {{ support_email }}</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;"></div>
+              <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/whatsapp.svg" alt="WhatsApp" width="16" height="16" style="vertical-align:middle;">
+              <span>WhatsApp us on {{ support_whatsapp }}</span>
+              </div>
             </td>
           </tr>
         </table>
