@@ -1,0 +1,93 @@
+# Sign Up end-point
+curl -X POST http://127.0.0.1:8000/api/auth/signup/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "Wesamoyo Peter",
+    "phone": "+256771858933",
+    "location": "Kampala",
+    "password": "TestPass123!",
+    "confirm_password": "TestPass123!"
+  }'
+
+# Response format
+{
+    "message":"Registration successful",
+    "user":{
+        "profile_data":
+        {
+            "loyalty_tier":"bronze",
+            "delivery_address":null,
+            "secondary_phone":null
+        }
+
+        },
+        "tokens":{
+            "refresh":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NTg1MzM0MCwiaWF0IjoxNzU1MjQ4NTQwLCJqdGkiOiJmNzQyMWY4YTU2YzQ0ZGI2ODQ0ZDMwYTBkNzA1YTIyOCIsInVzZXJfaWQiOiI2In0.cOTkyNnanimf2pg9-CvB8RaHN0WFi93qda4EyFUOwxA",
+            "access":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjUyMTQwLCJpYXQiOjE3NTUyNDg1NDAsImp0aSI6ImRiNGJiMGJlYWRjMzRmMzJhNzg0ZmVkYWIwMjRhY2YzIiwidXNlcl9pZCI6IjYifQ.PrOJ8_toqOl4W3IwSmpveo41J1Z76rZQlanpD0aRODs"
+        },
+        "dashboard_url":"/buyer/dashboard/"
+        }
+
+# Login endpoint
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "+256771858933",
+    "password": "TestPass123!"
+  }'
+
+# Response format
+{
+    "user":
+    {
+        "id":6,
+        "full_name":"Wesamoyo Peter",
+        "email":"",
+        "role":"buyer",
+        "phone":"+256771858933",
+        "location":"Kampala",
+        "first_name":"",
+        "last_name":"",
+        "profile_image":null
+        },
+        "access":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjUyNDAzLCJpYXQiOjE3NTUyNDg4MDMsImp0aSI6ImQyMzhkN2MwNDViZTQ2NDZiMzBhYmEwOTBjZGZkY2JkIiwidXNlcl9pZCI6IjYifQ.VDF8_zBr4Ob89faWj5W-YtvxexF0zR1RNMEa5GTFEEU",
+        "refresh":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc1NTg1MzYwMywiaWF0IjoxNzU1MjQ4ODAzLCJqdGkiOiI2MWI1MTU3N2QyYjE0MmIzYjVjMjJlZmVjYmVlZjkzMyIsInVzZXJfaWQiOiI2In0.PsRrOkhGECs12pEAwgB2YBnAu9mRQ4ylD0eurDMRQPU"
+        }
+
+# Add email endpoint
+curl -X POST http://127.0.0.1:8000/api/auth/add-email/ \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjUyNDAzLCJpYXQiOjE3NTUyNDg4MDMsImp0aSI6ImQyMzhkN2MwNDViZTQ2NDZiMzBhYmEwOTBjZGZkY2JkIiwidXNlcl9pZCI6IjYifQ.VDF8_zBr4Ob89faWj5W-YtvxexF0zR1RNMEa5GTFEEU" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "exnessfrancis@gmail.com"
+}'
+
+# Response format
+{
+    "detail":"Email added successfully. Now send verification."
+}
+
+
+# Sending a verification code
+curl -X POST http://127.0.0.1:8000/api/auth/email/send/ \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjY1MjE3LCJpYXQiOjE3NTUyNjE2MTcsImp0aSI6ImU3YzE3MDQyN2E5NDQ5OTA4OTllYzg3MjZmMGVhMTIzIiwidXNlcl9pZCI6IjYifQ.YjkR6TuAJzqXEsGQEv9y1WKktfI7e8ZGq2hF4ByN4bM" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "exnessfrancis@gmail.com",
+  "user_type": "buyer"
+}'
+
+# Response format
+{
+    "detail":"Verification code sent to your email."
+}
+
+
+# Email confirmation
+curl -X POST http://127.0.0.1:8000/api/auth/email/confirm/ \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjY1MjE3LCJpYXQiOjE3NTUyNjE2MTcsImp0aSI6ImU3YzE3MDQyN2E5NDQ5OTA4OTllYzg3MjZmMGVhMTIzIiwidXNlcl9pZCI6IjYifQ.YjkR6TuAJzqXEsGQEv9y1WKktfI7e8ZGq2hF4ByN4bM" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "exnessfrancis@gmail.com",
+  "verification_code": "214693"
+}'

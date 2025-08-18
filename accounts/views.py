@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.decorators import api_view
 
-from datetime import timezone, datetime
+from django.utils import timezone
 
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -16,6 +16,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import transaction
 from django.db import models
+from django.template.loader import render_to_string
 
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -28,14 +29,22 @@ from django.shortcuts import render
 
 import logging
 
-from .models import User, AdminProfile, BuyerProfile, VendorProfile, UserActivityLog, ArchiveUser
+from .utils.utils import mailer
+
+from .models import (
+    User, AdminProfile, BuyerProfile, VendorProfile, 
+    UserActivityLog, ArchiveUser, EmailVerification
+    )
+
 from .serializers import (
     UserDeleteSerializer, ProfileUpdateSerializer, 
     UserRegistrationSerializer, VendorRegistrationSerializer,
     UserLoginSerializer, ProfileUpdateSerializer,
     UserProfileSerializer, PasswordChangeSerializer,
     AdminUserManagementSerializer, UserActivityLogSerializer,
-    # PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    SendEmailVerificationSerializer, ConfirmEmailVerificationSerializer,
+    AddEmailSerializer,
+   
 
     PasswordResetRequestSerializer, 
     PasswordResetVerifySerializer,
@@ -54,6 +63,11 @@ from .security import (
     invalidate_user_cache, check_rate_limit, is_suspicious_activity,
     get_user_dashboard_url
 )
+
+from .tasks import send_verification_email_task
+
+# One email per minute per user + email
+RATE_LIMIT_SECONDS = 60 
 
 logger = logging.getLogger('accounts.security')
 User = get_user_model()
@@ -357,188 +371,6 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return response
     
 
-# User password reset view
-# class PasswordResetRequestView(generics.GenericAPIView):
-#     """
-#     Request a password reset email.
-#     Sends a token via email that will be used to reset password.
-#     """
-
-#     serializer_class = PasswordResetRequestSerializer
-#     permission_classes = [AllowAny]
-#     throttle_scope = 'password_reset'
-
-#     def post(self, request):
-#         serializer = self.get_serializer(data=request.data)
-#         if serializer.is_valid():
-#             email = serializer.validated_data['email']
-            
-#             # Rate limiting
-#             ip = request.META.get('REMOTE_ADDR', '')
-#             if not check_rate_limit(f"password_reset:{ip}", 3, 3600):  # 3 per hour
-#                 return Response(
-#                     {"detail": "Too many password reset attempts. Please try again later."},
-#                     status=status.HTTP_429_TOO_MANY_REQUESTS
-#                 )
-            
-#             try:
-#                 user = User.objects.get(email=email)
-                
-#                 # Generate password reset token
-#                 token = default_token_generator.make_token(user)
-#                 uid = urlsafe_base64_encode(force_bytes(user.pk))
-                
-#                 # Create reset URL
-#                 frontend_url = settings.FRONTEND_URL
-#                 reset_url = f"{frontend_url}/reset-password/{uid}/{token}/"
-                
-#                 # Send email
-#                 subject = "Password Reset Request"
-#                 email_template = "accounts/password_reset_email.html"
-#                 email_context = {
-#                     'user': user,
-#                     'reset_url': reset_url,
-#                     'site_name': settings.SITE_NAME,
-#                     'valid_hours': 24,  # Token validity period
-#                 }
-                
-#                 try:
-#                     # Render email template
-#                     html_message = render_to_string(email_template, email_context)
-#                     plain_message = f"Password Reset Link: {reset_url}\nValid for 24 hours."
-                    
-#                     # Send email
-#                     send_mail(
-#                         subject=subject,
-#                         message=plain_message,
-#                         from_email=settings.DEFAULT_FROM_EMAIL,
-#                         recipient_list=[email],
-#                         html_message=html_message,
-#                         fail_silently=False,
-#                     )
-                    
-#                     # Log the password reset request
-#                     log_user_activity(
-#                         user,
-#                         'PASSWORD_RESET_REQUEST',
-#                         'Password reset requested',
-#                         request
-#                     )
-                    
-#                 except Exception as e:
-#                     logger.error(f"Error sending password reset email: {str(e)}")
-#                     return Response(
-#                         {"detail": "Error sending password reset email. Please try again later."},
-#                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#                     )
-                
-#                 # Always return success to prevent email enumeration
-#                 return Response(
-#                     {"detail": "Password reset email has been sent if the email exists in our system."},
-#                     status=status.HTTP_200_OK
-#                 )
-                
-#             except User.DoesNotExist:
-#                 # Return a success message even if user doesn't exist (security)
-#                 return Response(
-#                     {"detail": "Password reset email has been sent if the email exists in our system."},
-#                     status=status.HTTP_200_OK
-#                 )
-                
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# class PasswordResetVerifyView(generics.GenericAPIView):
-#     """
-#     Verify password reset token.
-#     Used to validate the token before showing the password reset form.
-#     """
-#     permission_classes = [AllowAny]
-    
-#     def get(self, request, uidb64, token):
-#         try:
-#             # Decode user ID
-#             uid = force_str(urlsafe_base64_decode(uidb64))
-#             user = User.objects.get(pk=uid)
-            
-#             # Verify token
-#             if default_token_generator.check_token(user, token):
-#                 return Response(
-#                     {"detail": "Token is valid", "uidb64": uidb64, "token": token},
-#                     status=status.HTTP_200_OK
-#                 )
-            
-#             return Response(
-#                 {"detail": "Invalid or expired token."},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-            
-#         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-#             return Response(
-#                 {"detail": "Invalid reset link."},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-
-
-# class PasswordResetConfirmView(generics.GenericAPIView):
-#     """
-#     Complete the password reset process.
-#     Validates the token and sets the new password.
-#     """
-#     serializer_class = PasswordResetConfirmSerializer
-#     permission_classes = [AllowAny]
-    
-#     def post(self, request):
-#         serializer = self.get_serializer(data=request.data)
-#         if serializer.is_valid():
-#             try:
-#                 # Get validated data
-#                 token = serializer.validated_data['token']
-#                 uidb64 = serializer.validated_data['uidb64']
-#                 password = serializer.validated_data['password']
-                
-#                 # Decode user ID
-#                 uid = force_str(urlsafe_base64_decode(uidb64))
-#                 user = User.objects.get(pk=uid)
-                
-#                 # Verify token
-#                 if not default_token_generator.check_token(user, token):
-#                     return Response(
-#                         {"detail": "Invalid or expired token."},
-#                         status=status.HTTP_400_BAD_REQUEST
-#                     )
-                
-#                 # Set new password
-#                 user.set_password(password)
-#                 user.login_attempts = 0  # Reset login attempts
-#                 user.unlock_account()    # Unlock account if locked
-#                 user.save()
-                
-#                 # Log password reset
-#                 log_user_activity(
-#                     user,
-#                     'PASSWORD_RESET',
-#                     'Password reset successful',
-#                     request
-#                 )
-                
-#                 # Invalidate user cache
-#                 invalidate_user_cache(user.id)
-                
-#                 return Response(
-#                     {"detail": "Password has been reset successfully."},
-#                     status=status.HTTP_200_OK
-#                 )
-                
-#             except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-#                 return Response(
-#                     {"detail": "Invalid reset link."},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-                
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Add these views
 class PasswordResetRequestView(generics.GenericAPIView):
     """
     Request a password reset via email or phone.
@@ -1030,8 +862,6 @@ class DashboardStatsView(APIView):
         completed = sum(1 for field in fields if getattr(user, field))
         return int((completed / len(fields)) * 100)
 
-   
-
 
 @csrf_exempt
 def user_permissions(request):
@@ -1046,4 +876,89 @@ def user_permissions(request):
         return JsonResponse(permissions_data)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# Send email verification view
+class SendEmailVerificationView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = SendEmailVerificationSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email'].lower()
+        user_type = serializer.validated_data['user_type']
+
+        # Throttle key
+        key = f"email_verif_rl:{request.user.id}:{email}"
+        if cache.get(key):
+            return Response({"detail": "Please wait before requesting another code."},
+                            status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        # verification = EmailVerification.create_fresh(
+        #     user=request.user,
+        #     email=email,
+        #     user_type=user_type,
+        #     validity_minutes=10,
+        # )
+
+        verification = serializer.save()
+
+        # enqueue async email
+        send_verification_email_task.delay(verification.id)
+
+        # set throttle window
+        cache.set(key, 1, timeout=RATE_LIMIT_SECONDS)
+
+        return Response({"detail": "Verification code sent to your email."}, status=status.HTTP_200_OK)
+
+
+        # serializer = SendEmailVerificationSerializer(data=request.data, context={'request': request})
+        # serializer.is_valid(raise_exception=True)
+        # verification = serializer.save()
+
+        # # send email
+        # subject = "Your Email Verification Code"
+        # html_message = render_to_string('emails/verification_email.html', {
+        #     'code': verification.verification_code,
+        #     'user': request.user,
+        #     'expires_at': verification.expires_at
+        # })
+
+        # result = mailer.send(
+        #     to=request.user.email,
+        #     subject=subject,
+        #     html=html_message,
+        # )
+        # if result:
+        #     return Response({"message": result}, status=status.HTTP_200_OK)
+        # else:
+        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+
+# Email Confirmation
+class ConfirmEmailVerificationView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ConfirmEmailVerificationSerializer(data=request.data, context={'request': request})
+        # serializer = ConfirmEmailVerificationSerializer(data=request.data)
+
+        with transaction.atomic():
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        return Response({"detail": "Email successfully verified."}, status=status.HTTP_200_OK)
+
+
+# Add email view for users for 2 FA
+class AddEmailView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddEmailSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Email added successfully. Now send verification."}, status=status.HTTP_200_OK)
+    
 

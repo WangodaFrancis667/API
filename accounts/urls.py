@@ -8,7 +8,9 @@ from .views import (
     PasswordResetConfirmView, VendorRegistrationView,
     AdminUserManagementView, AdminUserDetailView, 
     VendorVerificationView, UserActivityLogView,
-    DashboardStatsView, 
+    DashboardStatsView, SendEmailVerificationView,
+    ConfirmEmailVerificationView, AddEmailView,
+
 
     )
 
@@ -42,11 +44,11 @@ urlpatterns = [
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     
 
-    # Password reset endpoints
-    # path('password-reset/', PasswordResetRequestView.as_view(), name='password-reset-request'),
-    # path('password-reset/verify/<str:uidb64>/<str:token>/', PasswordResetVerifyView.as_view(), name='password-reset-verify'),
-    # path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
-
+    # Email verification endpoints
+    path('add-email/', AddEmailView.as_view(), name='add-email'),
+    path('email/send/', SendEmailVerificationView.as_view(), name='send-email-verification'),
+    path('email/confirm/', ConfirmEmailVerificationView.as_view(), name='confirm-email-verification'),
+    
     # Password reset
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password-reset-request'),
     path('password-reset/verify/', PasswordResetVerifyView.as_view(), name='password-reset-verify'),
