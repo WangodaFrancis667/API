@@ -117,6 +117,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
 SUPPORT_EMAIL = 'info@afrobuyug.com'
 VERIFICATION_BCC = []        # optional list of emails to BCC
+SUPPORT_WHATSAPP = '+256709328790'
 
 
 
