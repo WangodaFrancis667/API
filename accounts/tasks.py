@@ -18,7 +18,7 @@ def send_verification_email_task(self, verification_id: int):
         logger.info("Verification %s already verified, skipping send.", verification_id)
         return
     
-    subject = getattr(settings, 'APP_NAME', 'Our App') + " — Email Verification Code"
+    subject = getattr(settings, 'APP_NAME', 'AfroBuy Uganda') + "  Email Verification Code"
     context = {
         'code': ver.verification_code,
         'user': ver.user,
@@ -27,6 +27,7 @@ def send_verification_email_task(self, verification_id: int):
         'expires_at_human': date_filter(ver.expires_at, "DATETIME_FORMAT"),
         'site_name': getattr(settings, 'SITE_NAME', getattr(settings, 'APP_NAME', 'AfroBuy')),
         'support_email': getattr(settings, 'SUPPORT_EMAIL', settings.EMAIL_HOST_USER),
+        'support_whatsapp': getattr(settings, 'SUPPORT_WHATSAPP')
     }
 
     ok = mailer.send_template(
