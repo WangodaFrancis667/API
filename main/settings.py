@@ -118,6 +118,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.co
 SUPPORT_EMAIL = 'info@afrobuyug.com'
 VERIFICATION_BCC = []        # optional list of emails to BCC
 SUPPORT_WHATSAPP = '+256709328790'
+WHATSAPP_URL = f'https://wa.me/{SUPPORT_WHATSAPP}'
 
 
 
