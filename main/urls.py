@@ -19,6 +19,10 @@ from django.urls import path, include
 from APIHealth.views import health_check
 
 urlpatterns = [
+
+    # Server root page view
+    path('', include('home_page.urls')),
+    
     path('admin/', admin.site.urls),
 
     # Health check
