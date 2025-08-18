@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     # local apps
     'accounts',
     'APIHealth',
+    'home_page',
 ]
 
 MIDDLEWARE = [
