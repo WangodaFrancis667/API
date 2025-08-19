@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 
+from celery.schedules import crontab
 from dotenv import load_dotenv
 from datetime import timedelta
 from pathlib import Path
@@ -162,8 +163,10 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "https://api.afrobuyug.com/"
+
+# uncomment incase Django is to store the images locally on the hosting service
+#  MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Default primary key field type
@@ -214,7 +217,9 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get('REDIS_URL', "redis://127.0.0.1:6379/1"),
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+            },
         "KEY_PREFIX": "afrobuy",
         "TIMEOUT": 300,  # 5 minutes default timeout
     }
@@ -229,7 +234,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 45
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "Africa/Kampala"
+CELERY_TIMEZONE = "UTC"
 
 # # Use dummy cache for testing when Redis is not available
 # import sys
@@ -253,6 +258,13 @@ CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+CELERY_BEAT_SCHEDULE = {
+    "refresh_categories_cache": {
+        "task": "categories.tasks.refresh_categories_cache",
+        "schedule": crontab(minute="*/5"),  # every 5 minutes
+    },
+}
 
 CORS_ALLOW_CREDENTIALS = True
 
