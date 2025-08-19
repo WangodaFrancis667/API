@@ -29,6 +29,7 @@ urlpatterns = [
     path('health/', health_check, name='health-check'),
 
     path('api/auth/', include('accounts.urls')),
+    path('api/products/', include('productManagement.urls'))
     # Add this line for DRF browsable API login/logout
     # path('api-auth/', include('rest_framework.urls')),
 ]
