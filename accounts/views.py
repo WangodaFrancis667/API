@@ -86,6 +86,15 @@ def status_view(request):
         return Response({'isAuthenticated': False}, status=status.HTTP_401_UNAUTHORIZED)
     
     user = request.user
+
+    # Log registration
+    log_user_activity(
+        user, 
+        'STATUS VIEW', 
+        'User status viewed',
+        request
+    )
+    
     return Response({
         'isAuthenticated': True,
         'user': {
@@ -113,6 +122,17 @@ class TokenRefreshCookieView(APIView):
             new_access_token = str(refresh.access_token)
         except TokenError:
             return Response({"error": "Invalid refresh token"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the user
+        user = request.user
+        
+        # Log registration
+        log_user_activity(
+            user, 
+            'TOKEN REFRESH REQUESTED', 
+            'User refreshed the token',
+            request
+        )
 
         response = Response({"access": new_access_token}, status=status.HTTP_200_OK)
         response.set_cookie(
@@ -133,6 +153,8 @@ class LoginView(generics.GenericAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
+
+        user = request.user
         try:
             if serializer.is_valid():
                 # Get validated data from serializer
@@ -143,9 +165,26 @@ class LoginView(generics.GenericAPIView):
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
+            
+            # Log registration
+            log_user_activity(
+                user, 
+                'LOGIN', 
+                'User logged in successfully',
+                request
+            )
+            
         except Exception as e:
             # log the exception
             logger.error(f"Login error: {str(e)}")
+
+            # Log registration
+            log_user_activity(
+                user, 
+                'LOGIN FAILED', 
+                'User login Failed',
+                request
+            )
 
             return Response(
                 {"error": "Authentication failed. Please try again."},
