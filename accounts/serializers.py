@@ -10,7 +10,8 @@ from django.core.cache import cache
 
 from .models import (
     User, AdminProfile, BuyerProfile, VendorProfile,
-    UserActivityLog, ArchiveUser, EmailVerification
+    UserActivityLog, ArchiveUser, EmailVerification,
+    PasswordReset,
 )
 
 import re
@@ -26,7 +27,7 @@ class AddEmailSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         value = value.lower()
-        if User.objects.filter(email=value).exists(): #or User.objects.filter(secondary_email=value).exists():
+        if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("This email is already in use.")
         return value
 
@@ -104,7 +105,6 @@ class UserRegistrationSerializer(serializers.Serializer):
     
     def create(self, validated_data):
         # create user with encrypted data and default profile
-        # user = User.objects.create_user(**validated_data)
 
         # Generate username from phone if not provided
         if 'username' not in validated_data or not validated_data['username']:
@@ -643,33 +643,42 @@ class UserDeleteSerializer(serializers.Serializer):
 # Password reset request
 class PasswordResetRequestSerializer(serializers.Serializer):
     """
-    Serializer for requesting a password reset through email or phone.
+    Serializer for requesting a password reset through email.
     """
-    email_or_phone = serializers.CharField(required=True)
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        email = value.lower()
+        if not User.objects.filter(email=email).exists():
+            # Don't reveal if user exists for security
+            pass
+        return email
     
-    def validate(self, attrs):
-        email_or_phone = attrs.get('email_or_phone')
+    # email_or_phone = serializers.CharField(required=True)
+    
+    # def validate(self, attrs):
+    #     email_or_phone = attrs.get('email_or_phone')
         
-        # Check if input is email or phone
-        if '@' in email_or_phone:
-            # Looks like an email
-            if not User.objects.filter(email=email_or_phone.lower()).exists():
-                # We don't reveal whether the email exists for security reasons
-                # Just return without error and handle in view
-                pass
-            attrs['is_email'] = True
-        else:
-            # Looks like a phone number
-            # Clean phone number
-            phone_clean = re.sub(r'[^\d+]', '', email_or_phone)
-            if not User.objects.filter(phone=phone_clean).exists():
-                # We don't reveal whether the phone exists for security reasons
-                # Just return without error and handle in view
-                pass
-            attrs['is_email'] = False
-            attrs['email_or_phone'] = phone_clean
+    #     # Check if input is email or phone
+    #     if '@' in email_or_phone:
+    #         # Looks like an email
+    #         if not User.objects.filter(email=email_or_phone.lower()).exists():
+    #             # We don't reveal whether the email exists for security reasons
+    #             # Just return without error and handle in view
+    #             pass
+    #         attrs['is_email'] = True
+    #     else:
+    #         # Looks like a phone number
+    #         # Clean phone number
+    #         phone_clean = re.sub(r'[^\d+]', '', email_or_phone)
+    #         if not User.objects.filter(phone=phone_clean).exists():
+    #             # We don't reveal whether the phone exists for security reasons
+    #             # Just return without error and handle in view
+    #             pass
+    #         attrs['is_email'] = False
+    #         attrs['email_or_phone'] = phone_clean
             
-        return attrs
+    #     return attrs
 
 
 # Password Verification
@@ -677,8 +686,38 @@ class PasswordResetVerifySerializer(serializers.Serializer):
     """
     Serializer for verifying a password reset token.
     """
-    token = serializers.CharField(required=True)
-    uidb64 = serializers.CharField(required=True)
+    email = serializers.EmailField()
+    verification_code = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        email = attrs['email'].lower()
+        code = attrs['verification_code']
+
+        try:
+            user = User.objects.get(email=email)
+            reset = PasswordReset.objects.filter(
+                user=user,
+                email=email,
+                verification_code=code,
+                is_used=False
+            ).first()
+            
+            if not reset:
+                raise serializers.ValidationError("Invalid verification code.")
+            
+            if reset.is_expired():
+                raise serializers.ValidationError("Verification code has expired.")
+            
+            attrs['reset_instance'] = reset
+            attrs['user'] = user
+            
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email address.")
+        
+        return attrs
+
+    # token = serializers.CharField(required=True)
+    # uidb64 = serializers.CharField(required=True)
 
 
 # Password reset confirmation
@@ -686,18 +725,74 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     """
     Serializer for confirming a password reset with a new password.
     """
-    token = serializers.CharField(required=True)
-    uidb64 = serializers.CharField(required=True)
-    new_password = serializers.CharField(write_only=True, validators=[validate_password])
-    new_password_confirm = serializers.CharField(write_only=True)
+    email = serializers.EmailField()
+    verification_code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+    confirm_password = serializers.CharField(min_length=8, write_only=True)
     
     def validate(self, attrs):
-        """Validate passwords match."""
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({"new_password_confirm": "Passwords don't match."})
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
         
-        # Token validation will be done in the view
+        email = attrs['email'].lower()
+        code = attrs['verification_code']
+        
+        try:
+            user = User.objects.get(email=email)
+            reset = PasswordReset.objects.filter(
+                user=user,
+                email=email,
+                verification_code=code,
+                is_used=False
+            ).first()
+            
+            if not reset:
+                raise serializers.ValidationError("Invalid verification code.")
+            
+            if reset.is_expired():
+                raise serializers.ValidationError("Verification code has expired.")
+            
+            attrs['reset_instance'] = reset
+            attrs['user'] = user
+            
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email address.")
+        
         return attrs
+    
+    def save(self):
+        reset = self.validated_data['reset_instance']
+        user = self.validated_data['user']
+        new_password = self.validated_data['new_password']
+        
+        # Update password
+        user.set_password(new_password)
+        
+        # Reset account security
+        user.login_attempts = 0
+        if user.is_account_locked():
+            user.unlock_account()
+        
+        user.save()
+        
+        # Mark reset as used
+        reset.is_used = True
+        reset.save()
+        
+        return user
+
+    # token = serializers.CharField(required=True)
+    # uidb64 = serializers.CharField(required=True)
+    # new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    # new_password_confirm = serializers.CharField(write_only=True)
+    
+    # def validate(self, attrs):
+    #     """Validate passwords match."""
+    #     if attrs['new_password'] != attrs['new_password_confirm']:
+    #         raise serializers.ValidationError({"new_password_confirm": "Passwords don't match."})
+        
+    #     # Token validation will be done in the view
+    #     return attrs
 
 
 # Email sending verification
@@ -736,10 +831,6 @@ class SendEmailVerificationSerializer(serializers.Serializer):
         if user.email_verified:
             raise serializers.ValidationError("Email already verified.")
         
-        # if User.objects.filter(email=attrs['email'].lower()).exists(): #or User.objects.filter(secondary_email=value).exists():
-        #     raise serializers.ValidationError("This email is already in use.")
-
-        
         return attrs
 
     def create(self, validated_data):
@@ -759,17 +850,6 @@ class SendEmailVerificationSerializer(serializers.Serializer):
                 'expires_at': timezone.now() + timedelta(minutes=10),
             }
         )
-            # EmailVerification.objects.filter(
-            #     user=user,
-            #     email=email,
-            #     verified=False
-            # ).delete()
-    
-            # verification = EmailVerification.create_verification(
-            #     user=user,
-            #     email=validated_data['email'],
-            #     user_type=validated_data['user_type'],
-            # )
 
         return verification
     
@@ -817,3 +897,5 @@ class ConfirmEmailVerificationSerializer(serializers.Serializer):
         ver: EmailVerification = self.validated_data['verification']
         ver.mark_verified()
         return ver
+
+
