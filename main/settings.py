@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'APIHealth',
     'home_page',
     'productManagement',
+    'app_settings',
 ]
 
 MIDDLEWARE = [
@@ -95,7 +96,7 @@ WSGI_APPLICATION = 'main.wsgi.application'
 
 # Frontend URL for password reset links
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-SITE_NAME = os.environ.get('SITE_NAME', 'Your App Name')
+SITE_NAME = os.environ.get('SITE_NAME', 'AfroBuy Uganda')
 APP_NAME = 'AfroBuy'
 
 DATABASES = {

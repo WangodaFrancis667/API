@@ -2,10 +2,12 @@ from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.utils import timezone
 from django.conf import settings
+
 from decimal import Decimal
 from datetime import timedelta
 
-
+import random
+import string
 import secrets
 
 
@@ -25,6 +27,46 @@ STATUS_CHOICES = (
 )
 
 
+# Password reste model
+class PasswordReset(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    email = models.EmailField()
+    verification_code = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @classmethod
+    def create_fresh(cls, user, email, validity_minutes=15):
+        """Create a fresh password reset code."""
+        # Invalidate any existing codes
+        cls.objects.filter(user=user, email=email, is_used=False).update(is_used=True)
+        
+        # Generate new code
+        code = ''.join(random.choices(string.digits, k=6))
+        expires_at = timezone.now() + timezone.timedelta(minutes=validity_minutes)
+        
+        return cls.objects.create(
+            user=user,
+            email=email,
+            verification_code=code,
+            expires_at=expires_at
+        )
+    
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+    
+    def is_valid(self):
+        return not self.is_used and not self.is_expired()
+    
+    def __str__(self):
+        return f"Password Reset for {self.user.username} - {self.verification_code}"
+
+
+# email verification model
 class EmailVerification(models.Model):
     USER_TYPES = (
         ('buyer', 'Buyer'),
@@ -84,17 +126,7 @@ class EmailVerification(models.Model):
                 verification_code=cls.generate_code(),
                 expires_at=timezone.now() + timedelta(minutes=validity_minutes),
             )
-
-        # create and return a new Email Verification instance
-        # code = cls.generate_code()
-        # expires = timezone.now() + timedelta(minutes=validity_minutes)
-        # return cls.objects.create(
-        #     user=user,
-        #     email=email,
-        #     user_type=user,
-        #     verification_code=code,
-        #     expires_at=expires,
-        # )
+        
     
     def mark_verified(self):
         # Mark email as verified and update the user's email status
@@ -117,6 +149,7 @@ class EmailVerification(models.Model):
         # Update the user model
         # self.user.email_verified = True
         # self.user.save(update_fields=['email_verified'])
+
 
 # User management model
 class UserManager(DjangoUserManager):
@@ -262,6 +295,7 @@ class User(AbstractUser):
             return True
         return False
     
+
 # Creating enhanced profiles for the specific roles
 # Admin profile
 class AdminProfile(models.Model):

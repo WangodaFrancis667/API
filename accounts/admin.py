@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
-from .models import User, AdminProfile, VendorProfile, BuyerProfile, UserActivityLog
+from .models import User, AdminProfile, VendorProfile, BuyerProfile, UserActivityLog, PasswordReset
 
 
 @admin.register(User)
@@ -183,3 +183,9 @@ class UserActivityLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         """Make activity logs read-only."""
         return False
+    
+
+@admin.register(PasswordReset)
+class PasswordResetAdmin(admin.ModelAdmin):
+    list_display = ("user", "email", "verification_code", "expires_at", "created_at" )
+    

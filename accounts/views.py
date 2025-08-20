@@ -33,7 +33,8 @@ from .utils.utils import mailer
 
 from .models import (
     User, AdminProfile, BuyerProfile, VendorProfile, 
-    UserActivityLog, ArchiveUser, EmailVerification
+    UserActivityLog, ArchiveUser, EmailVerification,
+    PasswordReset,
     )
 
 from .serializers import (
@@ -64,7 +65,7 @@ from .security import (
     get_user_dashboard_url
 )
 
-from .tasks import send_verification_email_task
+from .tasks import send_verification_email_task, send_password_reset_email_task
 
 # One email per minute per user + email
 RATE_LIMIT_SECONDS = 60 
@@ -412,7 +413,7 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 class PasswordResetRequestView(generics.GenericAPIView):
     """
-    Request a password reset via email or phone.
+    Request a password reset code via email.
     """
     serializer_class = PasswordResetRequestSerializer
     permission_classes = [AllowAny]
@@ -421,40 +422,47 @@ class PasswordResetRequestView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         
         if serializer.is_valid():
-            email_or_phone = serializer.validated_data['email_or_phone']
-            is_email = serializer.validated_data.get('is_email', True)
+            email = serializer.validated_data['email'].lower()
+            # is_email = serializer.validated_data.get('is_email', True)
             
             # Rate limiting
             ip = request.META.get('REMOTE_ADDR', '')
-            if not check_rate_limit(f"password_reset:{ip}", 3, 3600):  # 3 per hour
+            if not check_rate_limit(f"password_reset:{ip}", 10, 3600):  # 10 per hour
                 return Response(
                     {"detail": "Too many password reset attempts. Please try again later."},
                     status=status.HTTP_429_TOO_MANY_REQUESTS
                 )
-                
+            
+            # Rate limiting per email
+            email_key = f"password_reset_email:{email}"
+            if cache.get(email_key):
+                return Response(
+                    {"detail": "Please wait before requesting another reset code."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
             # Try to get the user
             try:
-                if is_email:
-                    user = User.objects.get(email=email_or_phone.lower())
-                else:
-                    user = User.objects.get(phone=email_or_phone)
+                user = User.objects.get(email=email)
                 
-                # Generate token
-                token = default_token_generator.make_token(user)
-                uid = urlsafe_base64_encode(force_bytes(user.pk))
-                reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+                # Create password reset instance
+                reset = PasswordReset.create_fresh(
+                    user=user,
+                    email=email,
+                    validity_minutes=15
+                )
                 
-                # Send notification (email or SMS)
-                if is_email and user.email:
-                    self._send_reset_email(user, reset_url)
-                elif user.phone:
-                    self._send_reset_sms(user, reset_url)
+                # Send email asynchronously
+                send_password_reset_email_task.delay(reset.id)
+                
+                # Set rate limit
+                cache.set(email_key, 1, timeout=RATE_LIMIT_SECONDS)
                 
                 # Log activity
                 log_user_activity(
                     user,
                     'PASSWORD_RESET_REQUEST',
-                    f"Password reset requested via {'email' if is_email else 'phone'}",
+                    "Password reset code requested",
                     request
                 )
                 
@@ -464,43 +472,82 @@ class PasswordResetRequestView(generics.GenericAPIView):
             
             # Always return success to prevent enumeration attacks
             return Response(
-                {"detail": "If a matching account was found, a password reset link has been sent."},
+                {"detail": "If a matching account was found, a password reset code has been sent to your email."},
                 status=status.HTTP_200_OK
             )
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+                
+    #         # Try to get the user
+    #         try:
+    #             if is_email:
+    #                 user = User.objects.get(email=email_or_phone.lower())
+    #             else:
+    #                 user = User.objects.get(phone=email_or_phone)
+                
+    #             # Generate token
+    #             token = default_token_generator.make_token(user)
+    #             uid = urlsafe_base64_encode(force_bytes(user.pk))
+    #             reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+                
+    #             # Send notification (email or SMS)
+    #             if is_email and user.email:
+    #                 self._send_reset_email(user, reset_url)
+    #             elif user.phone:
+    #                 self._send_reset_sms(user, reset_url)
+                
+    #             # Log activity
+    #             log_user_activity(
+    #                 user,
+    #                 'PASSWORD_RESET_REQUEST',
+    #                 f"Password reset requested via {'email' if is_email else 'phone'}",
+    #                 request
+    #             )
+                
+    #         except User.DoesNotExist:
+    #             # We don't reveal if the user exists for security
+    #             pass
+            
+    #         # Always return success to prevent enumeration attacks
+    #         return Response(
+    #             {"detail": "If a matching account was found, a password reset link has been sent."},
+    #             status=status.HTTP_200_OK
+    #         )
+            
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-    def _send_reset_email(self, user, reset_url):
-        """Send password reset email."""
-        subject = f"{settings.SITE_NAME} - Password Reset"
-        html_message = render_to_string('accounts/password_reset_email.html', {
-            'user': user,
-            'reset_url': reset_url,
-            'site_name': settings.SITE_NAME,
-            'valid_hours': 24
-        })
-        plain_message = f"Password Reset Link: {reset_url}\nValid for 24 hours."
+    # def _send_reset_email(self, user, reset_url):
+    #     """Send password reset email."""
+    #     subject = f"{settings.SITE_NAME} - Password Reset"
+    #     html_message = render_to_string('accounts/password_reset_email.html', {
+    #         'user': user,
+    #         'reset_url': reset_url,
+    #         'site_name': settings.SITE_NAME,
+    #         'valid_hours': 24
+    #     })
+    #     plain_message = f"Password Reset Link: {reset_url}\nValid for 24 hours."
         
-        try:
-            send_mail(
-                subject=subject,
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
-            logger.info(f"Password reset email sent to: {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send password reset email: {str(e)}")
+    #     try:
+    #         send_mail(
+    #             subject=subject,
+    #             message=plain_message,
+    #             from_email=settings.DEFAULT_FROM_EMAIL,
+    #             recipient_list=[user.email],
+    #             html_message=html_message,
+    #             fail_silently=False,
+    #         )
+    #         logger.info(f"Password reset email sent to: {user.email}")
+    #     except Exception as e:
+    #         logger.error(f"Failed to send password reset email: {str(e)}")
     
-    def _send_reset_sms(self, user, reset_url):
-        """Send password reset SMS."""
-        # Implement SMS sending logic here
-        # This is just a placeholder - you'll need to integrate with an SMS service
-        message = f"{settings.SITE_NAME}: Reset your password with this link: {reset_url}"
-        logger.info(f"Password reset SMS would be sent to: {user.phone}")
-        # In a real implementation, call your SMS service here
+    # def _send_reset_sms(self, user, reset_url):
+    #     """Send password reset SMS."""
+    #     # Implement SMS sending logic here
+    #     # This is just a placeholder - you'll need to integrate with an SMS service
+    #     message = f"{settings.SITE_NAME}: Reset your password with this link: {reset_url}"
+    #     logger.info(f"Password reset SMS would be sent to: {user.phone}")
+    #     # In a real implementation, call your SMS service here
 
 
 class PasswordResetVerifyView(generics.GenericAPIView):
@@ -510,67 +557,64 @@ class PasswordResetVerifyView(generics.GenericAPIView):
     """
     serializer_class = PasswordResetVerifySerializer
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         
         if serializer.is_valid():
-            token = serializer.validated_data['token']
-            uidb64 = serializer.validated_data['uidb64']
-            
-            try:
-                uid = force_str(urlsafe_base64_decode(uidb64))
-                user = User.objects.get(pk=uid)
-                
-                if default_token_generator.check_token(user, token):
-                    return Response(
-                        {"detail": "Token is valid", "uidb64": uidb64, "token": token},
-                        status=status.HTTP_200_OK
-                    )
-                
-                return Response(
-                    {"detail": "Invalid or expired token."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-                return Response(
-                    {"detail": "Invalid reset link."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            return Response(
+                {"detail": "Verification code is valid. You can now reset your password."},
+                status=status.HTTP_200_OK
+            )
                 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    
+    # def post(self, request):
+    #     serializer = self.get_serializer(data=request.data)
+        
+    #     if serializer.is_valid():
+    #         token = serializer.validated_data['token']
+    #         uidb64 = serializer.validated_data['uidb64']
+            
+    #         try:
+    #             uid = force_str(urlsafe_base64_decode(uidb64))
+    #             user = User.objects.get(pk=uid)
+                
+    #             if default_token_generator.check_token(user, token):
+    #                 return Response(
+    #                     {"detail": "Token is valid", "uidb64": uidb64, "token": token},
+    #                     status=status.HTTP_200_OK
+    #                 )
+                
+    #             return Response(
+    #                 {"detail": "Invalid or expired token."},
+    #                 status=status.HTTP_400_BAD_REQUEST
+    #             )
+                
+    #         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+    #             return Response(
+    #                 {"detail": "Invalid reset link."},
+    #                 status=status.HTTP_400_BAD_REQUEST
+    #             )
+                
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PasswordResetConfirmView(generics.GenericAPIView):
     """
-    Reset password with a valid token.
+    Reset password with a valid verification code.
     """
     serializer_class = PasswordResetConfirmSerializer
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         
         if serializer.is_valid():
-            token = serializer.validated_data['token']
-            uidb64 = serializer.validated_data['uidb64']
-            new_password = serializer.validated_data['new_password']
-            
             try:
-                uid = force_str(urlsafe_base64_decode(uidb64))
-                user = User.objects.get(pk=uid)
-                
-                if default_token_generator.check_token(user, token):
-                    # Set new password
-                    user.set_password(new_password)
-                    
-                    # Reset account security
-                    user.login_attempts = 0
-                    if user.is_account_locked():
-                        user.unlock_account()
-                    
-                    user.save()
+                with transaction.atomic():
+                    user = serializer.save()
                     
                     # Log activity
                     log_user_activity(
@@ -584,22 +628,70 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                     invalidate_user_cache(user.id)
                     
                     return Response(
-                        {"detail": "Password has been reset successfully."},
+                        {"detail": "Password has been reset successfully. You can now login with your new password."},
                         status=status.HTTP_200_OK
                     )
-                
+                    
+            except Exception as e:
+                logger.error(f"Password reset confirmation error: {e}")
                 return Response(
-                    {"detail": "Invalid or expired token."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-                return Response(
-                    {"detail": "Invalid reset link."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Password reset failed. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # def post(self, request):
+    #     serializer = self.get_serializer(data=request.data)
+        
+    #     if serializer.is_valid():
+    #         token = serializer.validated_data['token']
+    #         uidb64 = serializer.validated_data['uidb64']
+    #         new_password = serializer.validated_data['new_password']
+            
+    #         try:
+    #             uid = force_str(urlsafe_base64_decode(uidb64))
+    #             user = User.objects.get(pk=uid)
+                
+    #             if default_token_generator.check_token(user, token):
+    #                 # Set new password
+    #                 user.set_password(new_password)
+                    
+    #                 # Reset account security
+    #                 user.login_attempts = 0
+    #                 if user.is_account_locked():
+    #                     user.unlock_account()
+                    
+    #                 user.save()
+                    
+    #                 # Log activity
+    #                 log_user_activity(
+    #                     user,
+    #                     'PASSWORD_RESET_COMPLETE',
+    #                     "Password reset completed successfully",
+    #                     request
+    #                 )
+                    
+    #                 # Invalidate user cache
+    #                 invalidate_user_cache(user.id)
+                    
+    #                 return Response(
+    #                     {"detail": "Password has been reset successfully."},
+    #                     status=status.HTTP_200_OK
+    #                 )
+                
+    #             return Response(
+    #                 {"detail": "Invalid or expired token."},
+    #                 status=status.HTTP_400_BAD_REQUEST
+    #             )
+                
+    #         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+    #             return Response(
+    #                 {"detail": "Invalid reset link."},
+    #                 status=status.HTTP_400_BAD_REQUEST
+    #             )
+                
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
 # Admin vendor registration view
