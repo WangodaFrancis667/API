@@ -71,12 +71,12 @@ def send_password_reset_email_task(self, reset_id):
         
         reset = PasswordReset.objects.select_related('user').get(id=reset_id)
         
-        subject = f"{getattr(settings, 'SITE_NAME', 'afrobuyug')} - Password Reset Code"
+        subject = f"{getattr(settings, 'SITE_NAME', 'AfroBuyug Uganda')} - Password Reset Code"
         context = {
             'code': reset.verification_code,
             'user': reset.user,
             'expires_at': reset.expires_at,
-            'site_name': getattr(settings, 'SITE_NAME', 'afrobuyug'),
+            'site_name': getattr(settings, 'SITE_NAME', 'AfroBuyug Uganda'),
             'valid_minutes': 15,
             'support_email': getattr(settings, 'SUPPORT_EMAIL', settings.EMAIL_HOST_USER),
         }
