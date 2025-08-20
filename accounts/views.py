@@ -410,7 +410,6 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         
         return response
     
-
 class PasswordResetRequestView(generics.GenericAPIView):
     """
     Request a password reset code via email.
@@ -423,41 +422,41 @@ class PasswordResetRequestView(generics.GenericAPIView):
         
         if serializer.is_valid():
             email = serializer.validated_data['email'].lower()
-            # is_email = serializer.validated_data.get('is_email', True)
-            
-            # Rate limiting
-            ip = request.META.get('REMOTE_ADDR', '')
-            if not check_rate_limit(f"password_reset:{ip}", 10, 3600):  # 10 per hour
+
+            # --- Rate limiting per user (email-based) ---
+            # At most 10 reset requests per hour per email
+            user_rate_key = f"password_reset_user:{email}"
+            if not check_rate_limit(user_rate_key, 10, 3600):  
                 return Response(
                     {"detail": "Too many password reset attempts. Please try again later."},
                     status=status.HTTP_429_TOO_MANY_REQUESTS
                 )
             
-            # Rate limiting per email
-            email_key = f"password_reset_email:{email}"
-            if cache.get(email_key):
+            # Throttle consecutive requests (e.g., 1 per 2 minutes)
+            email_cooldown_key = f"password_reset_cooldown:{email}"
+            if cache.get(email_cooldown_key):
                 return Response(
                     {"detail": "Please wait before requesting another reset code."},
                     status=status.HTTP_429_TOO_MANY_REQUESTS
                 )
-            
+
             # Try to get the user
             try:
                 user = User.objects.get(email=email)
-                
+
                 # Create password reset instance
                 reset = PasswordReset.create_fresh(
                     user=user,
                     email=email,
                     validity_minutes=15
                 )
-                
+
                 # Send email asynchronously
                 send_password_reset_email_task.delay(reset.id)
-                
-                # Set rate limit
-                cache.set(email_key, 1, timeout=RATE_LIMIT_SECONDS)
-                
+
+                # Set cooldown (e.g., 120 sec)
+                cache.set(email_cooldown_key, 1, timeout=RATE_LIMIT_SECONDS)
+
                 # Log activity
                 log_user_activity(
                     user,
@@ -465,18 +464,19 @@ class PasswordResetRequestView(generics.GenericAPIView):
                     "Password reset code requested",
                     request
                 )
-                
+
             except User.DoesNotExist:
-                # We don't reveal if the user exists for security
+                # Do not reveal existence of user
                 pass
-            
-            # Always return success to prevent enumeration attacks
+
+            # Always return generic success
             return Response(
                 {"detail": "If a matching account was found, a password reset code has been sent to your email."},
                 status=status.HTTP_200_OK
             )
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
                 
     #         # Try to get the user
@@ -1020,52 +1020,37 @@ class SendEmailVerificationView(generics.GenericAPIView):
         email = serializer.validated_data['email'].lower()
         user_type = serializer.validated_data['user_type']
 
-        # Throttle key
-        key = f"email_verif_rl:{request.user.id}:{email}"
-        if cache.get(key):
-            return Response({"detail": "Please wait before requesting another code."},
-                            status=status.HTTP_429_TOO_MANY_REQUESTS)
+        # User-specific throttle key (not global)
+        user_email_key = f"email_verif_rl:{request.user.id}:{email}"
+        if cache.get(user_email_key):
+            return Response(
+                {"detail": "Please wait before requesting another code for this email."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
         
-        # verification = EmailVerification.create_fresh(
-        #     user=request.user,
-        #     email=email,
-        #     user_type=user_type,
-        #     validity_minutes=10,
-        # )
+        # Additional user rate limiting
+        user_rate_key = f"email_verif_user:{request.user.id}"
+        user_attempts = cache.get(user_rate_key, 0)
+        
+        if user_attempts >= 10:  # Max 10 verification attempts per hour per user
+            return Response(
+                {"detail": "Too many email verification attempts. Please try again later."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
 
         verification = serializer.save()
 
-        # enqueue async email
+        # Enqueue async email
         send_verification_email_task.delay(verification.id)
 
-        # set throttle window
-        cache.set(key, 1, timeout=RATE_LIMIT_SECONDS)
+        # Set throttle windows
+        cache.set(user_email_key, 1, timeout=RATE_LIMIT_SECONDS)  # 1 minute for specific email
+        cache.set(user_rate_key, user_attempts + 1, timeout=3600)  # 1 hour for user
 
-        return Response({"detail": "Verification code sent to your email."}, status=status.HTTP_200_OK)
-
-
-        # serializer = SendEmailVerificationSerializer(data=request.data, context={'request': request})
-        # serializer.is_valid(raise_exception=True)
-        # verification = serializer.save()
-
-        # # send email
-        # subject = "Your Email Verification Code"
-        # html_message = render_to_string('emails/verification_email.html', {
-        #     'code': verification.verification_code,
-        #     'user': request.user,
-        #     'expires_at': verification.expires_at
-        # })
-
-        # result = mailer.send(
-        #     to=request.user.email,
-        #     subject=subject,
-        #     html=html_message,
-        # )
-        # if result:
-        #     return Response({"message": result}, status=status.HTTP_200_OK)
-        # else:
-        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+        return Response(
+            {"detail": "Verification code sent to your email."}, 
+            status=status.HTTP_200_OK
+        )
 
 # Email Confirmation
 class ConfirmEmailVerificationView(generics.GenericAPIView):
