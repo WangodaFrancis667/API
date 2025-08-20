@@ -6,6 +6,7 @@ dumb.rdb
 
 # virtual env
 .env
+.env.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
