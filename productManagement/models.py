@@ -9,7 +9,7 @@ User = settings.AUTH_USER_MODEL
 class Categories(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(max_length=255)
-    image_url = models.ImageField(max_length=255)
+    image_url = models.CharField(max_length=255) 
     is_active = models.BooleanField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -24,7 +24,8 @@ class ProductMetaData(models.Model):
   type = models.CharField(
       max_length=255, 
       choices=TypeChoices.choices,
-      null=False,
+      default=TypeChoices.CATEGORY,
+      null=True,
       blank=False
       )
   
@@ -32,46 +33,22 @@ class ProductMetaData(models.Model):
   display_name = models.CharField(max_length=100, null=True)
   description = models.TextField(max_length=500,null=True)
   category_type = models.CharField(max_length=50, null=True)
-  is_active = models.IntegerField(default=1)
+  is_active = models.BooleanField(default=True)
   sort_order = models.IntegerField(default=0) 
   created_at = models.DateTimeField(auto_now_add=True) 
   updated_at = models.DateTimeField(auto_now=True) 
 
-# # products table
-# class Products(models.Model):
-#     vendor_id = models.IntegerField() 
-#     photo = models.CharField(max_length=255) 
-#     title = models.CharField(max_length=255)
-#     description = models.TextField(max_length=500)
-
-#     regular_price = models.DecimalField(
-#         max_digits=12, 
-#         decimal_places=2,
-#         default=Decimal('0.00'), 
-#         db_index=True
-#     )
-
-#     group_price = models.DecimalField(
-#         max_digits=12, 
-#         decimal_places=2,
-#         default=Decimal('0.00'), 
-#         db_index=True
-#     )
-
-#     min_quantity = models.IntegerField() 
-#     unit = models.CharField(max_length=255)
-#     category = models.CharField(max_length=255)
-#     # is_multiple_images = models. tinyint(1) DEFAULT 0,
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-#     created_by_admin = models.ForeignKey(User, models.CASCADE) 
-
-
 #  `photo`,  `unit`, `category`, `is_multiple_images`, `created_at`, `updated_at`, `created_by_admin`)
 class Products(models.Model):
-    vendor_id = models.ForeignKey(User, on_delete=models.CASCADE)  
+    vendor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="products_as_vendor",
+        # limit_choices_to={'groups__name': 'Vendor'},
+        db_column='vendor_id'
+    )
     title = models.CharField(max_length=255)
-    description = models.TextField(max_length=1000)
+    description = models.TextField()
     is_active = models.BooleanField(default=True)
 
     regular_price = models.DecimalField(
@@ -95,22 +72,30 @@ class Products(models.Model):
     category = models.ForeignKey(
         Categories,
         on_delete=models.CASCADE,
-        related_name="products"
+        # related_name="products",
+        # null=True, 
+        # blank=True,
+        db_column='category_id'
     )
 
-    # created_by_admin = models.ForeignKey(User, on_delete=models.CASCADE)
+    # created_by_admin = models.ForeignKey(
+    #     User,
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     related_name="products_created",
+    #     limit_choices_to={'groups__name': 'Admin'},
+    #     db_column='created_by_admin_id'
+    # )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = 'productManagement_products'
         indexes = [
-            models.Index(fields=['title', 'title']),
-            # models.Index(fields=['user', 'verified']),
+            models.Index(fields=['title']),
         ]
-
-        verbose_name = "title"
        
-
     
     def __str__(self):
         return self.title
