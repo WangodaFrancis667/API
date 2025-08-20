@@ -225,6 +225,13 @@ CACHES = {
     }
 }
 
+# Session engine (optional)
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
+# Cache timeout settings
+CACHE_TTL = 60 * 15  # 15 minutes
+
 # Celery (Redis broker & backend)
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/2"
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/3"
@@ -299,6 +306,11 @@ LOGGING = {
     'loggers': {
         'accounts.security': {
             'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'productManagement': {
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
         },
