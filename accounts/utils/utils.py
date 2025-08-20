@@ -30,6 +30,7 @@ class Mail:
         self.default_from = default_from or user
         self.admin_copy = admin_copy
 
+
     def _connect(self):
         """Establish an SMTP connection."""
         try:
