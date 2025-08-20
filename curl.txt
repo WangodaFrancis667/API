@@ -56,7 +56,7 @@ curl -X POST http://127.0.0.1:8000/api/auth/login/ \
 
 # Add email endpoint
 curl -X POST http://127.0.0.1:8000/api/auth/add-email/ \
--H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1MjUyNDAzLCJpYXQiOjE3NTUyNDg4MDMsImp0aSI6ImQyMzhkN2MwNDViZTQ2NDZiMzBhYmEwOTBjZGZkY2JkIiwidXNlcl9pZCI6IjYifQ.VDF8_zBr4Ob89faWj5W-YtvxexF0zR1RNMEa5GTFEEU" \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1NzIxMDkwLCJpYXQiOjE3NTU3MTc0OTAsImp0aSI6IjdlYzY1Zjc0MWE3YTQxOTRhZjJiZTc4OWU4Njg5ZGJlIiwidXNlcl9pZCI6IjcifQ.0QCBOiNqPllfYqhgHrEh5cRRqjTTNYIqbI1cA_iAnI4" \
 -H "Content-Type: application/json" \
 -d '{
   "email": "exnessfrancis@gmail.com"
@@ -90,4 +90,13 @@ curl -X POST http://127.0.0.1:8000/api/auth/email/confirm/ \
 -d '{
   "email": "exnessfrancis@gmail.com",
   "verification_code": "214693"
+}'
+
+
+curl -X POST http://127.0.0.1:8000/api/auth/email/confirm/ \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1NzIxMDkwLCJpYXQiOjE3NTU3MTc0OTAsImp0aSI6IjdlYzY1Zjc0MWE3YTQxOTRhZjJiZTc4OWU4Njg5ZGJlIiwidXNlcl9pZCI6IjcifQ.0QCBOiNqPllfYqhgHrEh5cRRqjTTNYIqbI1cA_iAnI4" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "franciswangoda466@gmail.com",
+  "verification_code": "425786"
 }'
