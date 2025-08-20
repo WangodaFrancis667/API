@@ -1,7 +1,7 @@
 from celery import shared_task
 from django.core.cache import cache
 from .models import Categories, Products, ProductMetaData
-from .serializers import CategoriesSerializer, ProductsSerializer, ProductsMetaDataSerializer
+from .serializers import CategoriesSerializer, ProductsSerializer
 import time
 
 @shared_task
