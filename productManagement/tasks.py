@@ -1,7 +1,7 @@
 from celery import shared_task
 from django.core.cache import cache
 from .models import Categories, Products, ProductMetaData
-from .serializers import CategoriesSerializer, ProductsSerializer
+from .serializers import CategoriesSerializer, ProductsSerializer, ProductMetaDataSerializer
 import time
 
 @shared_task
@@ -48,7 +48,7 @@ def warmup_product_cache():
 def warmup_productmetadata_cache():
     """Rebuild the full list + detail product caches periodically."""
     queryset = ProductMetaData.objects.filter(is_active=True)
-    serializer = ProductsMetaDataSerializer(queryset, many=True)
+    serializer = ProductMetaDataSerializer(queryset, many=True)
 
     # Warm up list cache
     cache.set(LIST_CACHE_KEY, serializer.data, timeout=CACHE_TIMEOUT)
