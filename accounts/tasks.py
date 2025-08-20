@@ -27,7 +27,8 @@ def send_verification_email_task(self, verification_id: int):
         'expires_at_human': date_filter(ver.expires_at, "DATETIME_FORMAT"),
         'site_name': getattr(settings, 'SITE_NAME', getattr(settings, 'APP_NAME', 'AfroBuy')),
         'support_email': getattr(settings, 'SUPPORT_EMAIL', settings.EMAIL_HOST_USER),
-        'support_whatsapp': getattr(settings, 'SUPPORT_WHATSAPP')
+        'support_whatsapp': getattr(settings, 'SUPPORT_WHATSAPP'),
+        'whatsapp_url': getattr(settings, 'WHATSAPP_URL')
     }
 
     ok = mailer.send_template(

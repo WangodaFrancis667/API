@@ -1,6 +1,9 @@
 .DS_STORE
 .DS_Store
 
+dumb.rdb
+*.rdb
+
 # virtual env
 .env
 .env.*

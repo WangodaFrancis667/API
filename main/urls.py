@@ -19,12 +19,17 @@ from django.urls import path, include
 from APIHealth.views import health_check
 
 urlpatterns = [
+
+    # Server root page view
+    path('', include('home_page.urls')),
+    
     path('admin/', admin.site.urls),
 
     # Health check
     path('health/', health_check, name='health-check'),
 
     path('api/auth/', include('accounts.urls')),
+    path('api/products/', include('productManagement.urls'))
     # Add this line for DRF browsable API login/logout
     # path('api-auth/', include('rest_framework.urls')),
 ]
