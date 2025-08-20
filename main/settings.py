@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'APIHealth',
     'home_page',
     'productManagement',
+    'app_settings',
 ]
 
 MIDDLEWARE = [
