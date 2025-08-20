@@ -4,12 +4,19 @@ from .views import (
     ProductMetaDataDetailView ,ProductView, ProductFullView, 
     ProductDetailView, ProductMetaDataListCreateView, ProductImageListCreateView,
     ProductImageDetailView, BulkImageUploadView, ProductWithImagesView,
+    ProductCreateView, ProductUpdateView, ProductDeleteView, ProductHardDeleteView,
 )
 
 urlpatterns = [
     path('categories/', CategoriesListView.as_view(), name='view-categories'),
 
-    # Product management endpoints
+    # Product CRUD management endpoints
+    path('create/', ProductCreateView.as_view(), name='create-product'),
+    path('<int:id>/update/', ProductUpdateView.as_view(), name='update-product'),
+    path('<int:id>/delete/', ProductDeleteView.as_view(), name='delete-product'),
+    path('<int:id>/hard-delete/', ProductHardDeleteView.as_view(), name='hard-delete-product'),
+
+    # Product view endpoints
     path('view-products/', ProductFullView.as_view(), name='view-products'),
     path('product-details/<int:id>/', ProductDetailView.as_view(), name='product-details'),
     path('product-list/', ProductView.as_view(), name='product-list'),
