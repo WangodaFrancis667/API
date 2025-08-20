@@ -1,10 +1,15 @@
 # making sure your Redis cache is always up-to-date instantly whenever an admin adds/updates/deletes a category
+import logging
 
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
-from .models import Categories, Products, ProductImage
+from django_redis import get_redis_connection
+
+from .models import Categories, Products, ProductImage, ProductMetaData
 from .serializers import CategoriesSerializer, ProductsSerializer
+
+logger = logging.getLogger(__name__)
 
 CACHE_KEY = "products_list"
 LIST_CACHE_KEY = "products_list"
@@ -109,3 +114,124 @@ def refresh_cache_on_delete(sender, instance, **kwargs):
     """Refresh list cache + delete detail cache when a product is deleted."""
     rebuild_list_cache()
     cache.delete(f"product_{instance.id}")
+
+
+
+@receiver(post_save, sender=ProductMetaData)
+def clear_productmetadata_cache_on_save(sender, instance, created, **kwargs):
+    """Clear ProductMetaData cache when a record is saved"""
+    try:
+        redis_conn = get_redis_connection("default")
+        
+        # Clear all ProductMetaData related cache
+        patterns = [
+            "productmetadata_list_*",
+            "productmetadata_type_*",
+            f"productmetadata_detail_{instance.pk}"
+        ]
+        
+        total_cleared = 0
+        for pattern in patterns:
+            keys = redis_conn.keys(pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                total_cleared += len(keys)
+        
+        action = "created" if created else "updated"
+        logger.info(
+            f"ProductMetaData {action} (ID: {instance.pk}). "
+            f"Cleared {total_cleared} cache keys."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache after ProductMetaData save: {str(e)}")
+
+
+@receiver(post_delete, sender=ProductMetaData)
+def clear_productmetadata_cache_on_delete(sender, instance, **kwargs):
+    """Clear ProductMetaData cache when a record is deleted"""
+    try:
+        redis_conn = get_redis_connection("default")
+        
+        # Clear all ProductMetaData related cache
+        patterns = [
+            "productmetadata_list_*",
+            "productmetadata_type_*",
+            f"productmetadata_detail_{instance.pk}"
+        ]
+        
+        total_cleared = 0
+        for pattern in patterns:
+            keys = redis_conn.keys(pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                total_cleared += len(keys)
+        
+        logger.info(
+            f"ProductMetaData deleted (ID: {instance.pk}). "
+            f"Cleared {total_cleared} cache keys."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache after ProductMetaData delete: {str(e)}")
+
+
+@receiver(post_save, sender=ProductImage)
+def clear_product_image_cache_on_save(sender, instance, created, **kwargs):
+    """Clear product image cache when an image is saved"""
+    try:
+        redis_conn = get_redis_connection("default")
+        product_id = instance.product.id
+        
+        patterns = [
+            f"product_images_{product_id}",
+            f"product_detail_{product_id}",
+            f"product_with_images_{product_id}",
+            "products_*"
+        ]
+        
+        total_cleared = 0
+        for pattern in patterns:
+            keys = redis_conn.keys(pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                total_cleared += len(keys)
+        
+        action = "created" if created else "updated"
+        logger.info(
+            f"ProductImage {action} (ID: {instance.pk}, Product: {product_id}). "
+            f"Cleared {total_cleared} cache keys."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache after ProductImage save: {str(e)}")
+
+
+@receiver(post_delete, sender=ProductImage)
+def clear_product_image_cache_on_delete(sender, instance, **kwargs):
+    """Clear product image cache when an image is deleted"""
+    try:
+        redis_conn = get_redis_connection("default")
+        product_id = instance.product.id
+        
+        patterns = [
+            f"product_images_{product_id}",
+            f"product_detail_{product_id}",
+            f"product_with_images_{product_id}",
+            "products_*"
+        ]
+        
+        total_cleared = 0
+        for pattern in patterns:
+            keys = redis_conn.keys(pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                total_cleared += len(keys)
+        
+        logger.info(
+            f"ProductImage deleted (ID: {instance.pk}, Product: {product_id}). "
+            f"Cleared {total_cleared} cache keys."
+        )
+        
+    except Exception as e:
+        logger.error(f"Error clearing cache after ProductImage delete: {str(e)}")
