@@ -16,6 +16,7 @@ from .models import (
 
 import re
 import logging
+import uuid
 
 
 logger = logging.getLogger('accounts.security')
@@ -167,35 +168,8 @@ class VendorRegistrationSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
 
-    class Meta:
-        model = User
-        fields = (
-            'id', 'full_name', 'phone', 'business_type', 'business_name'
-             'location', 'password', 'confirm_password'
-        )
-        extra_kwargs = {
-            'email': {'required': False},
-            'first_name': {'required': False},
-            'last_name': {'required': False},
-            'business_name': {'required': False},
-        }
-
-    def validate_email(self, value):
-        """Validate email format and uniqueness."""
-        if User.objects.filter(email=value.lower()).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value.lower()
-    
-    def validate_username(self, value):
-        # validate username format
-        if not re.match(r'^[a-zA-Z0-9_]+$', value):
-            raise serializers.ValidationError('Username can only contain letters, numbers, and underscores')
-        if len(value) < 4:
-            raise serializers.ValidationError('Username must be atleast four characters long')
-        return value
-    
     def validate_phone(self, value):
-        # validate and clean the phone
+        """Validate and clean the phone."""
         if value:
             # remove spaces and special characters
             phone_clean = re.sub(r'[^\d+]', '', value)
@@ -204,17 +178,32 @@ class VendorRegistrationSerializer(serializers.Serializer):
             return phone_clean
         return value
     
+    def validate(self, attrs):
+        """Validate password confirmation."""
+        if attrs.get('password') != attrs.get('password_confirm'):
+            raise serializers.ValidationError("Passwords do not match.")
+        return attrs
+    
     def create(self, validated_data):
         """
-           Create vendor with profile
+        Create vendor with profile
         """
+        # Remove password_confirm from validated data
+        validated_data.pop('password_confirm', None)
+        
         # Extract vendor-specific fields
         business_type = validated_data.pop('business_type')
         business_registration_number = validated_data.pop('business_registration_number', '')
 
-         # Set role to vendor
+        # Set role to vendor
         validated_data['role'] = 'vendor'
         validated_data['status'] = 'pending'  # Vendors start as pending verification
+
+        # Create user with a generated username
+       
+        username_base = validated_data['full_name'].lower().replace(' ', '_')
+        username = f"{username_base}_{str(uuid.uuid4())[:8]}"
+        validated_data['username'] = username
 
         user = User.objects.create_user(**validated_data)
 
@@ -453,7 +442,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
 
 
 # View profile    
-class UserProfileSerializer(serializers.Serializer):
+class UserProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for user profile with role-specific information.
     """
@@ -467,7 +456,7 @@ class UserProfileSerializer(serializers.Serializer):
             'wallet', 'referral_points', 'email_verified', 'phone_verified',
             'profile_image', 'date_joined', 'profile_data'
         )
-        read_only_fields = ('id', 'full_name', 'role', 'wallet', 'referral_points', 'date_joined')
+        read_only_fields = ('id', 'role', 'wallet', 'referral_points', 'date_joined')
 
     def get_profile_data(self, obj):
         """Get role-specific profile data."""
@@ -521,7 +510,8 @@ class UserProfileSerializer(serializers.Serializer):
         return super().update(instance, validated_data)
 
 
-
+# Password change serializer
+class PasswordChangeSerializer(serializers.Serializer):
     """
     Serializer for password change with validation.
     """
@@ -557,7 +547,7 @@ class UserProfileSerializer(serializers.Serializer):
   
 
 # Admin user management    
-class AdminUserManagementSerializer(serializers.Serializer):
+class AdminUserManagementSerializer(serializers.ModelSerializer):
     """
     Serializer for admin user management operations.
     """
@@ -568,21 +558,21 @@ class AdminUserManagementSerializer(serializers.Serializer):
             'id', 'username', 'email', 'first_name', 'last_name', 
             'phone', 'location', 'business_name', 'role', 'status',
             'wallet', 'referral_points', 'email_verified', 'phone_verified',
-            'is_active', 'login_attempts', 'account_locked_until'
+            'is_active', 'login_attempts', 'account_locked_until', 'date_joined',
+            'last_login'
         )
-        read_only_fields = ('id', 'username', 'wallet', 'referral_points')
+        read_only_fields = ('id', 'username', 'wallet', 'referral_points', 'date_joined', 'last_login')
     
     def validate_role(self, value):
         """Validate role changes."""
         if self.instance and self.instance.role != value:
-
             # Log role changes
             logger.warning(f"Role change attempted: {self.instance.username} from {self.instance.role} to {value}")
         return value
     
 
 # User activity logs
-class UserActivityLogSerializer(serializers.Serializer):
+class UserActivityLogSerializer(serializers.ModelSerializer):
     """
     Serializer for user activity logs.
     """
