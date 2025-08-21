@@ -1,0 +1,403 @@
+# API HEALTH & GENERAL ENDPOINTS - CURL COMMANDS
+# Base URL: http://localhost:8000
+# Authentication: Some endpoints require JWT tokens
+
+# ===============================
+# HEALTH CHECK ENDPOINTS
+# ===============================
+
+# 1. API Health Check
+curl -X GET http://localhost:8000/health/ \
+  -H "Accept: application/json"
+
+# 2. Detailed Health Check (if available)
+curl -X GET http://localhost:8000/health/detailed/ \
+  -H "Accept: application/json"
+
+# 3. Database Health Check
+curl -X GET http://localhost:8000/health/database/ \
+  -H "Accept: application/json"
+
+# 4. Cache Health Check (Redis)
+curl -X GET http://localhost:8000/health/cache/ \
+  -H "Accept: application/json"
+
+# 5. Celery Health Check (Background Tasks)
+curl -X GET http://localhost:8000/health/celery/ \
+  -H "Accept: application/json"
+
+# ===============================
+# HOME PAGE & GENERAL ENDPOINTS
+# ===============================
+
+# 6. Root/Home Page
+curl -X GET http://localhost:8000/ \
+  -H "Accept: text/html"
+
+# 7. Root Page with JSON Response
+curl -X GET http://localhost:8000/ \
+  -H "Accept: application/json"
+
+# 8. API Information
+curl -X GET http://localhost:8000/api/ \
+  -H "Accept: application/json"
+
+# 9. API Version Information
+curl -X GET http://localhost:8000/api/version/ \
+  -H "Accept: application/json"
+
+# ===============================
+# SYSTEM STATUS ENDPOINTS
+# ===============================
+
+# 10. Server Status
+curl -X GET http://localhost:8000/status/ \
+  -H "Accept: application/json"
+
+# 11. System Metrics (Admin Only)
+curl -X GET http://localhost:8000/metrics/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# 12. Uptime Information
+curl -X GET http://localhost:8000/uptime/ \
+  -H "Accept: application/json"
+
+# ===============================
+# CONFIGURATION ENDPOINTS
+# ===============================
+
+# 13. Get Public Configuration
+curl -X GET http://localhost:8000/config/ \
+  -H "Accept: application/json"
+
+# 14. Get Frontend Configuration
+curl -X GET http://localhost:8000/config/frontend/ \
+  -H "Accept: application/json"
+
+# 15. Get API Endpoints List
+curl -X GET http://localhost:8000/api/endpoints/ \
+  -H "Accept: application/json"
+
+# ===============================
+# DOCUMENTATION ENDPOINTS
+# ===============================
+
+# 16. API Documentation (if Swagger/OpenAPI is enabled)
+curl -X GET http://localhost:8000/docs/ \
+  -H "Accept: text/html"
+
+# 17. API Schema (OpenAPI JSON)
+curl -X GET http://localhost:8000/schema/ \
+  -H "Accept: application/json"
+
+# 18. API Redoc Documentation
+curl -X GET http://localhost:8000/redoc/ \
+  -H "Accept: text/html"
+
+# ===============================
+# DEVELOPMENT & DEBUG ENDPOINTS
+# ===============================
+
+# 19. Debug Information (Development Mode Only)
+curl -X GET http://localhost:8000/debug/ \
+  -H "Accept: application/json"
+
+# 20. Environment Information (Admin Only)
+curl -X GET http://localhost:8000/debug/environment/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# 21. Django Settings Info (Admin Only - Development)
+curl -X GET http://localhost:8000/debug/settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# ===============================
+# STATIC CONTENT ENDPOINTS
+# ===============================
+
+# 22. Static Files (CSS, JS, Images)
+curl -X GET http://localhost:8000/static/css/style.css
+
+# 23. Media Files (User Uploads)
+curl -X GET http://localhost:8000/media/profiles/user_avatar.jpg
+
+# 24. Product Images
+curl -X GET http://localhost:8000/media/uploads/products/product_image.jpg
+
+# ===============================
+# MAINTENANCE & ADMIN ENDPOINTS
+# ===============================
+
+# 25. Maintenance Mode Status
+curl -X GET http://localhost:8000/maintenance/ \
+  -H "Accept: application/json"
+
+# 26. Enable Maintenance Mode (Admin Only)
+curl -X POST http://localhost:8000/maintenance/enable/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "System maintenance in progress. We will be back shortly.",
+    "estimated_duration": "2 hours"
+  }'
+
+# 27. Disable Maintenance Mode (Admin Only)
+curl -X POST http://localhost:8000/maintenance/disable/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# CACHE MANAGEMENT ENDPOINTS
+# ===============================
+
+# 28. Clear All Cache (Admin Only)
+curl -X DELETE http://localhost:8000/cache/clear/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 29. Clear Specific Cache Key (Admin Only)
+curl -X DELETE http://localhost:8000/cache/clear/specific/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cache_key": "categories_cache"
+  }'
+
+# 30. Get Cache Statistics (Admin Only)
+curl -X GET http://localhost:8000/cache/stats/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# SEARCH ENDPOINTS
+# ===============================
+
+# 31. Global Search
+curl -X GET "http://localhost:8000/search/?q=iPhone" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 32. Search with Filters
+curl -X GET "http://localhost:8000/search/?q=electronics&type=products&limit=10" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# RATE LIMITING ENDPOINTS
+# ===============================
+
+# 33. Check Rate Limit Status
+curl -X GET http://localhost:8000/rate-limit/status/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 34. Reset Rate Limit (Admin Only)
+curl -X POST http://localhost:8000/rate-limit/reset/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1
+  }'
+
+# ===============================
+# SECURITY ENDPOINTS
+# ===============================
+
+# 35. Security Headers Check
+curl -X GET http://localhost:8000/security/headers/ \
+  -H "Accept: application/json"
+
+# 36. CSRF Token (if needed)
+curl -X GET http://localhost:8000/csrf-token/ \
+  -H "Accept: application/json"
+
+# ===============================
+# WEBHOOK ENDPOINTS
+# ===============================
+
+# 37. Payment Webhook (External Payment Processors)
+curl -X POST http://localhost:8000/webhooks/payment/ \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: your_webhook_signature" \
+  -d '{
+    "event": "payment.completed",
+    "order_id": "12345",
+    "payment_id": "pay_67890",
+    "amount": "99.99",
+    "status": "completed"
+  }'
+
+# 38. Delivery Webhook (Shipping Partners)
+curl -X POST http://localhost:8000/webhooks/delivery/ \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Signature: your_webhook_signature" \
+  -d '{
+    "event": "delivery.updated",
+    "tracking_number": "TRACK123456",
+    "status": "delivered",
+    "delivered_at": "2025-08-21T14:30:00Z"
+  }'
+
+# ===============================
+# BACKUP & EXPORT ENDPOINTS
+# ===============================
+
+# 39. Export Data (Admin Only)
+curl -X GET http://localhost:8000/export/data/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# 40. Export Users (Admin Only)
+curl -X GET http://localhost:8000/export/users/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: text/csv" \
+  -o "users_export.csv"
+
+# 41. Export Orders (Admin Only)
+curl -X GET http://localhost:8000/export/orders/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: text/csv" \
+  -o "orders_export.csv"
+
+# 42. Export Products (Admin Only)
+curl -X GET http://localhost:8000/export/products/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: text/csv" \
+  -o "products_export.csv"
+
+# ===============================
+# ANALYTICS ENDPOINTS
+# ===============================
+
+# 43. General Analytics (Admin Only)
+curl -X GET http://localhost:8000/analytics/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 44. User Analytics (Admin Only)
+curl -X GET http://localhost:8000/analytics/users/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 45. Sales Analytics (Admin Only)
+curl -X GET http://localhost:8000/analytics/sales/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 46. Product Performance Analytics (Admin Only)
+curl -X GET http://localhost:8000/analytics/products/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# TESTING ENDPOINTS
+# ===============================
+
+# 47. Test Database Connection
+curl -X GET http://localhost:8000/test/db/ \
+  -H "Accept: application/json"
+
+# 48. Test Email Service
+curl -X POST http://localhost:8000/test/email/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "test@example.com",
+    "subject": "Test Email",
+    "message": "This is a test email."
+  }'
+
+# 49. Test SMS Service
+curl -X POST http://localhost:8000/test/sms/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "+1234567890",
+    "message": "This is a test SMS."
+  }'
+
+# 50. Test Push Notifications
+curl -X POST http://localhost:8000/test/push/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "title": "Test Notification",
+    "message": "This is a test push notification."
+  }'
+
+# ===============================
+# ERROR HANDLING EXAMPLES
+# ===============================
+
+# Common HTTP Status Codes:
+# - 200: Success
+# - 201: Created successfully
+# - 204: No content (successful action with no response body)
+# - 400: Bad request
+# - 401: Unauthorized
+# - 403: Forbidden
+# - 404: Not found
+# - 405: Method not allowed
+# - 429: Too many requests
+# - 500: Internal server error
+# - 502: Bad gateway
+# - 503: Service unavailable (maintenance mode)
+
+# Health Check Response Examples:
+
+# Healthy Response:
+# {
+#   "status": "healthy",
+#   "timestamp": "2025-08-21T12:00:00Z",
+#   "version": "1.0.0",
+#   "services": {
+#     "database": "healthy",
+#     "redis": "healthy",
+#     "celery": "healthy"
+#   }
+# }
+
+# Unhealthy Response:
+# {
+#   "status": "unhealthy",
+#   "timestamp": "2025-08-21T12:00:00Z",
+#   "version": "1.0.0",
+#   "services": {
+#     "database": "healthy",
+#     "redis": "unhealthy",
+#     "celery": "degraded"
+#   },
+#   "errors": ["Redis connection failed", "Celery worker queue is full"]
+# }
+
+# ===============================
+# MONITORING & LOGGING
+# ===============================
+
+# Response Headers to Monitor:
+# - X-Response-Time: Response processing time
+# - X-RateLimit-Remaining: Remaining API calls
+# - X-RateLimit-Reset: Rate limit reset time
+# - X-Cache-Status: Cache hit/miss status
+
+# ===============================
+# NOTES & BEST PRACTICES
+# ===============================
+
+# 1. Health Checks:
+#    - Use for monitoring and load balancer health checks
+#    - Should be lightweight and not require authentication
+#    - Include dependent service status
+
+# 2. Security:
+#    - Always use HTTPS in production
+#    - Validate webhook signatures
+#    - Implement proper rate limiting
+
+# 3. Maintenance:
+#    - Gracefully handle maintenance mode
+#    - Provide estimated duration when possible
+#    - Return appropriate HTTP status codes (503)
+
+# 4. Performance:
+#    - Monitor response times
+#    - Use caching for frequently accessed data
+#    - Implement proper pagination
+
+# 5. Error Handling:
+#    - Return consistent error response formats
+#    - Include helpful error messages
+#    - Log errors for debugging
