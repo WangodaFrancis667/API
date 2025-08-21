@@ -4,7 +4,7 @@ from celery import shared_task, group
 from django.utils import timezone
 
 from .models import InAppNotifications, NotificationTypes, UserTypes
-from .services import _invalidate_user_cache
+from .utils import invalidate_user_cache
 
 User = get_user_model()
 
@@ -43,7 +43,7 @@ def fanout_app_update_task(self, title: str, message: str, version: str = ""):
 
         # Coarse cache invalidation for users in this batch
         for row in batch:
-            _invalidate_user_cache(row['id'], UserTypes.BUYER)
+            invalidate_user_cache(row['id'], UserTypes.BUYER)
 
         start += BATCH_SIZE
 
