@@ -1,0 +1,282 @@
+# ACCOUNTS API ENDPOINTS - CURL COMMANDS
+# Base URL: http://localhost:8000/api/auth
+# Authentication: JWT tokens required for most endpoints
+
+# ======================# 18. Verify Vendor Account (Admin Only)
+curl -X POST http://localhost:8000/api/auth/admin/vendor/1/verify/ 
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" 
+  -H "Content-Type: application/json" 
+  -d '{
+    "action": "verify",
+    "verification_notes": "Documents verified successfully"
+  }'
+
+# Alternative format for vendor verification
+curl -X POST http://localhost:8000/api/auth/admin/vendor/1/verify/ 
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" 
+  -H "Content-Type: application/json" 
+  -d '{
+    "is_verified": true,
+    "verification_notes": "Documents verified successfully"
+  }'=
+# AUTHENTICATION ENDPOINTS
+# ===============================
+
+# 1. User Registration (Buyer only)
+curl -X POST http://localhost:8000/api/auth/signup/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "John Doe",
+    "phone": "+1234567890",
+    "location": "New York, NY",
+    "password": "SecurePass123!",
+    "confirm_password": "SecurePass123!"
+  }'
+
+# 2. User Login
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin1234",
+    "password": "009Wan@pro"
+  }'
+
+# Alternative login with email (if email is set)
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "SecurePass123!"
+  }'
+
+# 3. User Logout
+curl -X POST http://localhost:8000/api/auth/logout/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+
+# 4. Refresh Access Token
+curl -X POST http://localhost:8000/api/auth/token/refresh/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh": "YOUR_REFRESH_TOKEN"
+  }'
+
+# 5. Check Authentication Status
+curl -X GET http://localhost:8000/api/auth/status/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1Nzc3ODI0LCJpYXQiOjE3NTU3NzQyMjQsImp0aSI6IjVmOTIzNTA1YTIwYTRkYTQ4MzFmZDEyNTk0NGI2YWFjIiwidXNlcl9pZCI6IjYifQ.A2sDPAQpkMufCbI7oaF2EZNFsrZPJg3UPRwPr-rrfh8"
+
+# ===============================
+# PROFILE MANAGEMENT ENDPOINTS
+# ===============================
+
+# 6. Get User Profile
+curl -X GET http://localhost:8000/api/auth/profile/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyMDE1LCJpYXQiOjE3NTU3OTg0MTUsImp0aSI6IjJmODQyNGRjMmNiNzQ4NmE5ZmM4ZjU2ZmM0Njg2ZTFkIiwidXNlcl9pZCI6IjEifQ.Cc7A98bpPIXncSZRBYTz21NsLjPeam03A7nrVQlrdh4"
+
+# 7. Update User Profile
+curl -X PATCH http://localhost:8000/api/auth/update-profile/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1Nzc3ODI0LCJpYXQiOjE3NTU3NzQyMjQsImp0aSI6IjVmOTIzNTA1YTIwYTRkYTQ4MzFmZDEyNTk0NGI2YWFjIiwidXNlcl9pZCI6IjYifQ.A2sDPAQpkMufCbI7oaF2EZNFsrZPJg3UPRwPr-rrfh8" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "John Updated Doe",
+    "phone": "+256771858933",
+    "location": "Los Angeles, CA",
+    "business_name": "John Business Corp"
+  }'
+
+
+-------> This has not yet been tested
+# 8. Update Profile with Image (multipart/form-data)
+curl -X PUT http://localhost:8000/api/auth/update-profile/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1Nzc3ODI0LCJpYXQiOjE3NTU3NzQyMjQsImp0aSI6IjVmOTIzNTA1YTIwYTRkYTQ4MzFmZDEyNTk0NGI2YWFjIiwidXNlcl9pZCI6IjYifQ.A2sDPAQpkMufCbI7oaF2EZNFsrZPJg3UPRwPr-rrfh8" \
+  -F "full_name=John Doe Updated" \
+  -F "phone=+1234567890" \
+  -F "location=Boston, MA" \
+  -F "profile_image=@https://api.afrobuyug.com/uploads/products/688c5e5517306.jpg',"
+
+# ===============================
+# EMAIL VERIFICATION ENDPOINTS
+# ===============================
+
+# 9. Add Email to Account
+curl -X POST http://localhost:8000/api/auth/add-email/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1Nzc3ODI0LCJpYXQiOjE3NTU3NzQyMjQsImp0aSI6IjVmOTIzNTA1YTIwYTRkYTQ4MzFmZDEyNTk0NGI2YWFjIiwidXNlcl9pZCI6IjYifQ.A2sDPAQpkMufCbI7oaF2EZNFsrZPJg3UPRwPr-rrfh8" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "fwangoda@gmail.com"
+  }'
+
+# 10. Send Email Verification Code
+curl -X POST http://localhost:8000/api/auth/email/send/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "exnessfrancis@gmail.com",
+    "user_type" : "admin"
+  }'
+
+# 11. Confirm Email Verification
+curl -X POST http://localhost:8000/api/auth/email/confirm/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "exnessfrancis@gmail.com",
+    "verification_code": "189115"
+  }'
+
+# ===============================
+# PASSWORD RESET ENDPOINTS
+# ===============================
+
+# 12. Request Password Reset
+curl -X POST http://localhost:8000/api/auth/password-reset/request/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com"
+  }'
+
+# 13. Verify Password Reset Code
+curl -X POST http://localhost:8000/api/auth/password-reset/verify/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com",
+    "verification_code": "123456"
+  }'
+
+# 14. Confirm Password Reset (Set New Password)
+curl -X POST http://localhost:8000/api/auth/password-reset/confirm/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com",
+    "verification_code": "123456",
+    "new_password": "NewSecurePass123!",
+    "confirm_password": "NewSecurePass123!"
+  }'
+
+# ===============================
+# ADMIN ENDPOINTS (Admin Role Required)
+# ===============================
+
+# 15. Get All Users (Admin Only)
+curl -X GET http://localhost:8000/api/auth/admin/users/ \
+  -H "Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# 16. Get User Details (Admin Only)
+curl -X GET http://localhost:8000/api/auth/admin/users/1/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# 17. Create Vendor Account (Admin Only)
+curl -X POST http://localhost:8000/api/auth/admin/vendor/create/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "full_name": "Jane Vendor",
+    "business_type": "Electronics",
+    "phone": "+1234567891",
+    "location": "Chicago, IL",
+    "business_registration_number": "REG123456",
+    "password": "VendorPass123!",
+    "password_confirm": "VendorPass123!"
+  }'
+
+    
+# 18. Verify Vendor Account (Admin Only)
+curl -X POST http://localhost:8000/api/auth/admin/vendor/9/verify/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "is_verified": "verify,
+    "verification_notes": "Documents verified successfully"
+  }'
+
+# ===============================
+# ACTIVITY & DASHBOARD ENDPOINTS
+# ===============================
+
+# 19. Get User Activity Logs
+curl -X GET http://localhost:8000/api/auth/activity-logs/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# 20. Get Dashboard Statistics
+curl -X GET http://localhost:8000/api/auth/dashboard/stats/ \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# ===============================
+# ACCOUNT MANAGEMENT
+# ===============================
+
+# 21. Delete Account
+curl -X DELETE http://localhost:8000/api/auth/delete-account/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "password": "SecurePass123!",
+    "confirmation": "DELETE_ACCOUNT"
+  }'
+
+# ===============================
+# PAGINATION & FILTERING EXAMPLES
+# ===============================
+
+# 22. Get Users with Pagination (Admin Only)
+curl -X GET "http://localhost:8000/api/auth/admin/users/?limit=10&offset=0" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# 23. Filter Users by Role (Admin Only)
+curl -X GET "http://localhost:8000/api/auth/admin/users/?role=vendor" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# 24. Get Activity Logs with Date Filter
+curl -X GET "http://localhost:8000/api/auth/activity-logs/?start_date=2025-01-01&end_date=2025-01-31" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODAyNDI2LCJpYXQiOjE3NTU3OTg4MjYsImp0aSI6ImNlMDgxODYxZDVmYjQzNzE4MGIzODI0ODljZDc1ODE3IiwidXNlcl9pZCI6IjgifQ.yftGn3AU8Sp2wf3KyqV4ap09KbeXSmzsVeWnt90ECmg"
+
+# ===============================
+# BULK OPERATIONS (Admin Only)
+# ===============================
+
+# 25. Bulk User Status Update (Admin Only)
+curl -X PATCH http://localhost:8000/api/auth/admin/users/bulk-status/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_ids": [1, 2, 3],
+    "status": "active"
+  }'
+
+# ===============================
+# SECURITY & RATE LIMITING NOTES
+# ===============================
+
+# Rate Limits:
+# - Login: 5 attempts per minute
+# - Registration: 3 attempts per minute
+# - Anonymous: 100 requests per hour
+# - Authenticated users: 1000 requests per hour
+
+# Security Headers Required:
+# - Authorization: Bearer [token] for authenticated endpoints
+# - Content-Type: application/json for POST/PUT requests
+# - X-CSRF-Token may be required for certain operations
+
+# ===============================
+# ERROR HANDLING EXAMPLES
+# ===============================
+
+# Common HTTP Status Codes:
+# - 200: Success
+# - 201: Created successfully
+# - 400: Bad request (validation errors)
+# - 401: Unauthorized (invalid/missing token)
+# - 403: Forbidden (insufficient permissions)
+# - 404: Not found
+# - 429: Too many requests (rate limited)
+# - 500: Internal server error
+
+# Example error response structure:
+# {
+#   "error": "Validation failed",
+#   "details": {
+#     "email": ["This field is required."],
+#     "password": ["Password too weak."]
+#   }
+# }

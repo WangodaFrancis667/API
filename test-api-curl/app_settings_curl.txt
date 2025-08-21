@@ -1,0 +1,371 @@
+# APP SETTINGS API ENDPOINTS - CURL COMMANDS
+# Base URL: http://localhost:8000/api/app
+# Authentication: JWT tokens required for most endpoints
+
+# ===============================
+# APP SETTINGS ENDPOINTS
+# ===============================
+
+# 1. Get All App Settings
+curl -X GET http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 2. Get App Settings with Pagination
+curl -X GET "http://localhost:8000/api/app/app-settings/?limit=10&offset=0" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 3. Create New App Setting (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "app_version",
+    "setting_value": "1.0.0"
+  }'
+
+# 4. Create Maintenance Mode Setting (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "maintenance_mode",
+    "setting_value": "false"
+  }'
+
+# 5. Create App Configuration Settings (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "max_upload_size",
+    "setting_value": "5242880"
+  }'
+
+# 6. Create Feature Flags (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "enable_group_orders",
+    "setting_value": "true"
+  }'
+
+# 7. Create Email Configuration (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "smtp_server",
+    "setting_value": "smtp.gmail.com"
+  }'
+
+# 8. Create Payment Configuration (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "payment_methods",
+    "setting_value": "{\"mobile_money\": true, \"cash_on_delivery\": true, \"bank_transfer\": false}"
+  }'
+
+# ===============================
+# SPECIFIC APP SETTING ENDPOINTS
+# ===============================
+
+# 9. Get Specific App Setting by ID
+curl -X GET http://localhost:8000/api/app/app-settings/1/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 10. Update Specific App Setting (Admin Only)
+curl -X PUT http://localhost:8000/api/app/app-settings/1/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "app_version",
+    "setting_value": "1.0.1"
+  }'
+
+# 11. Partial Update App Setting (Admin Only)
+curl -X PATCH http://localhost:8000/api/app/app-settings/1/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_value": "1.0.2"
+  }'
+
+# 12. Delete App Setting (Admin Only)
+curl -X DELETE http://localhost:8000/api/app/app-settings/1/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# COMMON APP SETTINGS EXAMPLES
+# ===============================
+
+# 13. Set Delivery Fee Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "default_delivery_fee",
+    "setting_value": "5.00"
+  }'
+
+# 14. Set Minimum Order Value
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "minimum_order_value",
+    "setting_value": "10.00"
+  }'
+
+# 15. Set Group Order Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "group_order_deadline_hours",
+    "setting_value": "24"
+  }'
+
+# 16. Set User Registration Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "require_email_verification",
+    "setting_value": "true"
+  }'
+
+# 17. Set Notification Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "notification_retention_days",
+    "setting_value": "30"
+  }'
+
+# 18. Set File Upload Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "allowed_image_formats",
+    "setting_value": "[\"jpg\", \"jpeg\", \"png\", \"webp\"]"
+  }'
+
+# 19. Set Security Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "max_login_attempts",
+    "setting_value": "5"
+  }'
+
+# 20. Set Cache Configuration
+curl -X POST http://localhost:8000/api/app/app-settings/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "setting_key": "cache_timeout_minutes",
+    "setting_value": "15"
+  }'
+
+# ===============================
+# FILTERING & SEARCHING
+# ===============================
+
+# 21. Search Settings by Key
+curl -X GET "http://localhost:8000/api/app/app-settings/?search=payment" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 22. Filter Settings by Key Pattern
+curl -X GET "http://localhost:8000/api/app/app-settings/?setting_key__contains=email" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 23. Get Recent Settings (by created_at)
+curl -X GET "http://localhost:8000/api/app/app-settings/?ordering=-created_at" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 24. Get Settings Modified After Date
+curl -X GET "http://localhost:8000/api/app/app-settings/?updated_at__gte=2025-01-01" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# BULK OPERATIONS (Admin Only)
+# ===============================
+
+# 25. Bulk Create Settings
+curl -X POST http://localhost:8000/api/app/app-settings/bulk-create/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "settings": [
+      {
+        "setting_key": "social_login_google",
+        "setting_value": "true"
+      },
+      {
+        "setting_key": "social_login_facebook",
+        "setting_value": "false"
+      },
+      {
+        "setting_key": "terms_version",
+        "setting_value": "1.1"
+      }
+    ]
+  }'
+
+# 26. Bulk Update Settings
+curl -X PUT http://localhost:8000/api/app/app-settings/bulk-update/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": [
+      {
+        "id": 1,
+        "setting_value": "updated_value_1"
+      },
+      {
+        "id": 2,
+        "setting_value": "updated_value_2"
+      }
+    ]
+  }'
+
+# ===============================
+# CONFIGURATION PRESETS
+# ===============================
+
+# 27. Initialize Default App Settings (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/initialize-defaults/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+
+# 28. Reset Settings to Default (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/reset-to-defaults/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "confirm": "RESET_ALL_SETTINGS"
+  }'
+
+# 29. Export Settings Configuration (Admin Only)
+curl -X GET http://localhost:8000/api/app/app-settings/export/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Accept: application/json"
+
+# 30. Import Settings Configuration (Admin Only)
+curl -X POST http://localhost:8000/api/app/app-settings/import/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "settings": [
+      {
+        "setting_key": "imported_setting_1",
+        "setting_value": "imported_value_1"
+      }
+    ]
+  }'
+
+# ===============================
+# ERROR HANDLING EXAMPLES
+# ===============================
+
+# Common HTTP Status Codes:
+# - 200: Success
+# - 201: Created successfully
+# - 400: Bad request (validation errors)
+# - 401: Unauthorized (invalid/missing token)
+# - 403: Forbidden (insufficient permissions - not admin)
+# - 404: Setting not found
+# - 409: Conflict (duplicate setting key)
+# - 429: Too many requests (rate limited)
+
+# Example validation error response:
+# {
+#   "error": "Validation failed",
+#   "details": {
+#     "setting_key": ["This field is required."],
+#     "setting_value": ["This field cannot be blank."]
+#   }
+# }
+
+# ===============================
+# COMMON SETTING KEYS REFERENCE
+# ===============================
+
+# App Configuration:
+# - app_version
+# - app_name
+# - app_description
+# - maintenance_mode
+# - debug_mode
+
+# File/Upload Settings:
+# - max_upload_size
+# - allowed_image_formats
+# - allowed_file_types
+# - upload_directory
+
+# Payment Settings:
+# - payment_methods
+# - default_currency
+# - tax_rate
+# - default_delivery_fee
+# - minimum_order_value
+
+# Email Settings:
+# - smtp_server
+# - smtp_port
+# - smtp_username
+# - email_from_address
+# - email_from_name
+
+# Security Settings:
+# - max_login_attempts
+# - account_lockout_minutes
+# - password_min_length
+# - require_email_verification
+# - session_timeout_minutes
+
+# Feature Flags:
+# - enable_group_orders
+# - enable_social_login
+# - enable_push_notifications
+# - enable_reviews
+# - enable_ratings
+
+# Business Settings:
+# - business_hours
+# - contact_email
+# - contact_phone
+# - support_email
+# - terms_version
+# - privacy_policy_version
+
+# ===============================
+# NOTES & BEST PRACTICES
+# ===============================
+
+# 1. Settings Structure:
+#    - Use descriptive setting_key names
+#    - Store complex configurations as JSON strings
+#    - Version important settings (e.g., terms_version)
+
+# 2. Permissions:
+#    - Only admins can create/update/delete settings
+#    - All authenticated users can view settings
+#    - Some sensitive settings may require special permissions
+
+# 3. Data Types:
+#    - All setting values are stored as text
+#    - Convert to appropriate types in application logic
+#    - Use JSON for complex data structures
+
+# 4. Caching:
+#    - Settings are typically cached for performance
+#    - Clear cache after updates
+#    - Consider TTL for different setting types
