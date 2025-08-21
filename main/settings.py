@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'productManagement',
     'app_settings',
     'notifications',
+    'orders',
 ]
 
 MIDDLEWARE = [
