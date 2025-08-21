@@ -1,0 +1,403 @@
+# NOTIFICATIONS API ENDPOINTS - CURL COMMANDS
+# Base URL: http://localhost:8000/api/notifications
+# Authentication: JWT tokens required for most endpoints
+
+# ===============================
+# NOTIFICATION LISTING ENDPOINTS
+# ===============================
+
+# 1. Get All Notifications for Authenticated User
+curl -X GET http://localhost:8000/api/notifications/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 2. Get Notifications with Pagination
+curl -X GET "http://localhost:8000/api/notifications/?limit=10&offset=0" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 3. Filter Notifications by Type
+curl -X GET "http://localhost:8000/api/notifications/?type=order_created" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 4. Filter Unread Notifications Only
+curl -X GET "http://localhost:8000/api/notifications/?is_read=false" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 5. Filter Read Notifications Only
+curl -X GET "http://localhost:8000/api/notifications/?is_read=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 6. Filter Urgent Notifications
+curl -X GET "http://localhost:8000/api/notifications/?is_urgent=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 7. Get Recent Notifications (Last 7 Days)
+curl -X GET "http://localhost:8000/api/notifications/?created_at__gte=$(date -d '7 days ago' -Iseconds)" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 8. Sort Notifications by Date (Newest First)
+curl -X GET "http://localhost:8000/api/notifications/?ordering=-created_at" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# NOTIFICATION COUNT ENDPOINTS
+# ===============================
+
+# 9. Get Unread Notifications Count
+curl -X GET http://localhost:8000/api/notifications/unread-count/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# MARK AS READ ENDPOINTS
+# ===============================
+
+# 10. Mark Single Notification as Read
+curl -X POST http://localhost:8000/api/notifications/mark-read/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notification_id": 1
+  }'
+
+# 11. Mark Multiple Notifications as Read
+curl -X POST http://localhost:8000/api/notifications/mark-read/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notification_ids": [1, 2, 3, 4, 5]
+  }'
+
+# 12. Mark All Notifications as Read
+curl -X POST http://localhost:8000/api/notifications/mark-all-read/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json"
+
+# 13. Mark All Notifications of Specific Type as Read
+curl -X POST http://localhost:8000/api/notifications/mark-all-read/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notification_type": "order_update"
+  }'
+
+# ===============================
+# DELETE NOTIFICATION ENDPOINTS
+# ===============================
+
+# 14. Delete Single Notification
+curl -X DELETE http://localhost:8000/api/notifications/delete/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notification_id": 1
+  }'
+
+# 15. Delete Multiple Notifications
+curl -X DELETE http://localhost:8000/api/notifications/delete/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notification_ids": [1, 2, 3]
+  }'
+
+# 16. Delete All Notifications for User
+curl -X DELETE http://localhost:8000/api/notifications/delete-all/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "confirm": "DELETE_ALL_NOTIFICATIONS"
+  }'
+
+# 17. Delete All Read Notifications
+curl -X DELETE http://localhost:8000/api/notifications/delete-all/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": "read_only"
+  }'
+
+# 18. Delete Old Notifications (Older than 30 days)
+curl -X DELETE http://localhost:8000/api/notifications/delete-all/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filter": "older_than_days",
+    "days": 30
+  }'
+
+# ===============================
+# PHONE-BASED NOTIFICATIONS
+# ===============================
+
+# 19. Get Notifications by Phone Number (Admin Only)
+curl -X GET http://localhost:8000/api/notifications/by-phone/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "+1234567890"
+  }'
+
+# 20. Get Notifications by Phone with Filters (Admin Only)
+curl -X GET http://localhost:8000/api/notifications/by-phone/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "+1234567890",
+    "type": "otp_verification",
+    "is_read": false
+  }'
+
+# ===============================
+# CUSTOM NOTIFICATION CREATION
+# ===============================
+
+# 21. Create Custom Notification (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/custom/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "type": "general",
+    "title": "System Maintenance Notice",
+    "message": "The system will be down for maintenance on Sunday from 2-4 AM.",
+    "is_urgent": true
+  }'
+
+# 22. Create OTP Verification Notification (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/custom/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "type": "otp_verification",
+    "title": "Email Verification Code",
+    "message": "Your email verification code is: {otp_code}",
+    "otp_code": "123456",
+    "expires_at": "2025-08-21T18:00:00Z"
+  }'
+
+# 23. Create Order Notification (Admin/System Only)
+curl -X POST http://localhost:8000/api/notifications/custom/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 2,
+    "type": "order_created",
+    "title": "New Order Received",
+    "message": "You have received a new order #12345",
+    "metadata": {
+      "order_id": 12345,
+      "order_total": "99.99",
+      "customer_name": "John Doe"
+    }
+  }'
+
+# 24. Create Bulk Custom Notifications (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/custom/bulk/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notifications": [
+      {
+        "user_id": 1,
+        "type": "app_update",
+        "title": "App Update Available",
+        "message": "New version 2.0 is now available for download"
+      },
+      {
+        "user_id": 2,
+        "type": "app_update",
+        "title": "App Update Available",
+        "message": "New version 2.0 is now available for download"
+      }
+    ]
+  }'
+
+# 25. Broadcast Notification to All Users (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/custom/broadcast/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "general",
+    "title": "Holiday Sale",
+    "message": "Up to 50% off on selected items. Limited time offer!",
+    "user_type": "buyer",
+    "is_urgent": false
+  }'
+
+# 26. Broadcast to Vendors Only (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/custom/broadcast/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "general",
+    "title": "New Vendor Policy",
+    "message": "Please review the updated vendor terms and conditions.",
+    "user_type": "vendor",
+    "is_urgent": true
+  }'
+
+# ===============================
+# NOTIFICATION PREFERENCES
+# ===============================
+
+# 27. Get User Notification Preferences
+curl -X GET http://localhost:8000/api/notifications/preferences/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 28. Update Notification Preferences
+curl -X PUT http://localhost:8000/api/notifications/preferences/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email_notifications": true,
+    "push_notifications": true,
+    "sms_notifications": false,
+    "notification_types": {
+      "order_updates": true,
+      "payment_updates": true,
+      "general": false,
+      "app_updates": true
+    }
+  }'
+
+# ===============================
+# ADVANCED FILTERING & SEARCH
+# ===============================
+
+# 29. Search Notifications by Title/Message
+curl -X GET "http://localhost:8000/api/notifications/?search=order" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 30. Get Notifications by Multiple Types
+curl -X GET "http://localhost:8000/api/notifications/?type__in=order_created,order_update,payment_update" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 31. Get Notifications Created Today
+curl -X GET "http://localhost:8000/api/notifications/?created_at__date=$(date +%Y-%m-%d)" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 32. Get Non-Expired Notifications
+curl -X GET "http://localhost:8000/api/notifications/?expires_at__gt=$(date -Iseconds)" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 33. Complex Filter - Unread, Urgent, Recent
+curl -X GET "http://localhost:8000/api/notifications/?is_read=false&is_urgent=true&created_at__gte=$(date -d '3 days ago' -Iseconds)" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# NOTIFICATION STATISTICS
+# ===============================
+
+# 34. Get Notification Statistics (Admin Only)
+curl -X GET http://localhost:8000/api/notifications/stats/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 35. Get User-Specific Notification Stats
+curl -X GET http://localhost:8000/api/notifications/stats/user/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 36. Get Notification Stats by Type (Admin Only)
+curl -X GET "http://localhost:8000/api/notifications/stats/by-type/" \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# CLEANUP & MAINTENANCE
+# ===============================
+
+# 37. Cleanup Expired Notifications (Admin Only)
+curl -X DELETE http://localhost:8000/api/notifications/cleanup/expired/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 38. Archive Old Notifications (Admin Only)
+curl -X POST http://localhost:8000/api/notifications/archive/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "older_than_days": 90
+  }'
+
+# ===============================
+# ERROR HANDLING EXAMPLES
+# ===============================
+
+# Common HTTP Status Codes:
+# - 200: Success
+# - 201: Created successfully
+# - 204: No content (successful deletion)
+# - 400: Bad request (validation errors)
+# - 401: Unauthorized (invalid/missing token)
+# - 403: Forbidden (insufficient permissions)
+# - 404: Notification not found
+# - 429: Too many requests (rate limited)
+
+# Example validation error response:
+# {
+#   "error": "Validation failed",
+#   "details": {
+#     "notification_id": ["This field is required."],
+#     "type": ["Invalid notification type."]
+#   }
+# }
+
+# ===============================
+# NOTIFICATION TYPES REFERENCE
+# ===============================
+
+# Available Notification Types:
+# - otp_password_reset: OTP codes for password reset
+# - otp_verification: OTP codes for email/phone verification
+# - general: General announcements and messages
+# - order_created: New order notifications (for vendors)
+# - order_update: Order status updates (for buyers)
+# - payment_update: Payment status changes
+# - app_update: App version updates and maintenance notices
+
+# ===============================
+# METADATA EXAMPLES
+# ===============================
+
+# Order-related metadata:
+# {
+#   "order_id": 12345,
+#   "order_total": "99.99",
+#   "customer_name": "John Doe",
+#   "vendor_name": "Jane's Store"
+# }
+
+# Payment-related metadata:
+# {
+#   "payment_id": "pay_67890",
+#   "amount": "49.99",
+#   "payment_method": "mobile_money"
+# }
+
+# OTP-related metadata:
+# {
+#   "expires_in_minutes": 10,
+#   "attempt_count": 1,
+#   "max_attempts": 3
+# }
+
+# ===============================
+# NOTES & BEST PRACTICES
+# ===============================
+
+# 1. Permissions:
+#    - Users can only view/manage their own notifications
+#    - Admins can create custom notifications and view system stats
+#    - Phone-based queries are admin-only for privacy
+
+# 2. Expiration:
+#    - OTP notifications typically expire in 10-15 minutes
+#    - General notifications may have no expiration
+#    - Expired notifications are automatically cleaned up
+
+# 3. Performance:
+#    - Use pagination for large notification lists
+#    - Filter by type and read status for better performance
+#    - Consider archiving old notifications periodically
+
+# 4. Real-time Updates:
+#    - Consider using WebSocket connections for real-time notifications
+#    - Implement push notifications for mobile apps
+#    - Use SSE (Server-Sent Events) for web applications
