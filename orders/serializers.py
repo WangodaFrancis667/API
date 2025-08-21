@@ -1,6 +1,24 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
 
+from rest_framework import serializers
+
+class UpdateOrderStatusSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+    new_status = serializers.ChoiceField(choices=[
+        ('processing', 'processing'),
+        ('shipped', 'shipped'),
+        ('delivered', 'delivered'),
+        ('cancelled', 'cancelled'),
+    ])
+
+class OrderReturnCreateSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+    return_reason = serializers.CharField()
+
+
+
+
 class OrderItemCreateSerializer(serializers.Serializer):
     product_id = serializers.IntegerField(min_value=1)
     quantity = serializers.IntegerField(min_value=1)
