@@ -71,6 +71,7 @@ class EmailVerification(models.Model):
     USER_TYPES = (
         ('buyer', 'Buyer'),
         ('vendor', 'Vendor'),
+        ('admin', 'Admin'),
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
