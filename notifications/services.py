@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.core.cache import cache
 from django.conf import settings
 
+from celery import shared_task
+
 from .models import InAppNotifications, NotificationTypes, UserTypes
 from .utils import invalidate_user_cache, CACHE_TTL, LIST_CACHE_KEY, COUNT_CACHE_KEY
 
@@ -278,3 +280,63 @@ def create_app_update_for_all_users(title: str, message: str, version: str | Non
         # Invalidate cache for all users
         for user_id, user_type in users_to_invalidate:
             invalidate_user_cache(user_id, user_type)
+
+
+# def notify_vendor_new_order(vendor_id, order_id, product_name, buyer_id, quantity):
+#     """
+#     Send notification to vendor about new order
+#     """
+#     # TODO: Implement vendor notification logic
+#     print(f"Vendor {vendor_id} has new order {order_id} for {product_name}")
+#     pass
+
+
+
+# def notify_buyer_status(buyer_id, order_id, status, product_name):
+#     """
+#     Send notification to buyer about order status change
+#     """
+#     # TODO: Implement buyer notification logic
+#     print(f"Buyer {buyer_id} order {order_id} status: {status} for {product_name}")
+#     pass
+
+
+def _create(user_id:int, user_type:str, phone:str, type_:str, title:str, message:str, is_urgent=False, expires_at=None, otp_code=None):
+    return InAppNotifications.objects.create(
+        user_id=user_id, user_type=user_type, phone=phone, type=type_,
+        title=title, message=message, is_urgent=is_urgent, expires_at=expires_at, otp_code=otp_code
+    )
+
+
+
+# These task wrappers are called from orders.services after DB commit
+@shared_task
+def notify_vendor_new_order(*, vendor_id:int, order_id:int, product_name:str, buyer_id:int, quantity:int):
+    title = "New Order Received"
+    msg = f"You have a new order for {quantity}x {product_name}. Order ID: #{order_id}."
+    # You'll likely fetch vendor phone from your Vendors table
+    phone = "0000000000"
+    _create(user_id=vendor_id, user_type="vendor", phone=phone, type_="order_created",
+            title=title, message=msg, is_urgent=True)
+
+@shared_task
+def notify_buyer_status(*, buyer_id:int, order_id:int, status:str, product_name:str):
+    titles = {
+        "pending":"Order Placed Successfully",
+        "processing":"Order Processing",
+        "shipped":"Order Shipped",
+        "delivered":"Order Delivered",
+        "cancelled":"Order Cancelled",
+    }
+    messages = {
+        "pending":"Your order is pending and will be processed soon.",
+        "processing":"Your order is being processed by the vendor.",
+        "shipped":"Great news! Your order has been shipped and is on its way.",
+        "delivered":"Your order has been delivered successfully.",
+        "cancelled":"Your order has been cancelled.",
+    }
+    title = titles.get(status, "Order Status Updated")
+    msg = f"{messages.get(status, f'Your order status has been updated to {status}.')} Order ID: #{order_id} - {product_name}"
+    phone = "0000000000"  # fetch from Buyers table
+    _create(user_id=buyer_id, user_type="buyer", phone=phone, type_="order_update",
+            title=title, message=msg, is_urgent=(status in {"shipped","delivered","cancelled"}))
