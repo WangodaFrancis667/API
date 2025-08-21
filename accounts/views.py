@@ -731,19 +731,23 @@ class VendorVerificationView(APIView):
             user = User.objects.get(id=user_id, role='vendor')
             vendor_profile = user.vendor_profile
             
-            action = request.data.get('action')  # 'verify' or 'unverify'
+            # Handle both 'action' and 'is_verified' fields for backward compatibility
+            action = request.data.get('action')
+            is_verified = request.data.get('is_verified')
             
-            if action == 'verify':
+            if action == 'verify' or is_verified is True or is_verified == 'verify':
                 vendor_profile.is_verified_vendor = True
                 user.status = 'active'
                 log_message = f'Vendor {user.username} verified'
-            elif action == 'unverify':
+                action_taken = 'verify'
+            elif action == 'unverify' or is_verified is False or is_verified == 'unverify':
                 vendor_profile.is_verified_vendor = False
                 user.status = 'pending'
                 log_message = f'Vendor {user.username} unverified'
+                action_taken = 'unverify'
             else:
                 return Response(
-                    {"error": "Invalid action. Use 'verify' or 'unverify'"},
+                    {"error": "Invalid action. Use 'verify' or 'unverify' in 'action' field, or true/false in 'is_verified' field"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -759,7 +763,7 @@ class VendorVerificationView(APIView):
                 'VENDOR_VERIFICATION',
                 log_message,
                 request,
-                {'target_user_id': user.id, 'action': action}
+                {'target_user_id': user.id, 'action': action_taken}
             )
             
             return Response({
