@@ -1,6 +1,6 @@
 # notifications/services.py
 from datetime import timedelta
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 from django.core.cache import cache
 from django.conf import settings
@@ -38,6 +38,7 @@ def _enforce_visibility_rules(user_type: str, ntype: str) -> bool:
         }
     return False
 
+# Deleting the otp
 @transaction.atomic
 def delete_otp_for_phone(phone: str):
     InAppNotifications.objects.filter(
@@ -45,6 +46,7 @@ def delete_otp_for_phone(phone: str):
         type__in=[NotificationTypes.OTP_PASSWORD_RESET, NotificationTypes.OTP_VERIFICATION]
     ).delete()
 
+# Creating an otp verification
 @transaction.atomic
 def create_otp_notification(*, user, user_type: str, phone: str, otp_code: str, minutes_valid: int = 15):
     # Unique OTP per phone (like PHP)
