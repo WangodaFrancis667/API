@@ -2,7 +2,7 @@ import psutil
 import socket
 import time
 import platform
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.db import connections
@@ -49,7 +49,7 @@ def health_check(request):
     """
     data = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "version": getattr(settings, "APP_VERSION", "1.0.0"),
         "site_name": getattr(settings, "SITE_NAME", "Afrobuy Team Uganda"),
         "server": socket.gethostname(),
