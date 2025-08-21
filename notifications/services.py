@@ -6,19 +6,8 @@ from django.core.cache import cache
 from django.conf import settings
 
 from .models import InAppNotifications, NotificationTypes, UserTypes
-from .tasks import fanout_app_update_task, warm_user_notification_cache_task
+from .utils import invalidate_user_cache, CACHE_TTL, LIST_CACHE_KEY, COUNT_CACHE_KEY
 
-CACHE_TTL = 60 * 5  # 5 minutes
-LIST_CACHE_KEY = "notifications:list:{uid}:{utype}:{unread}:{limit}"
-COUNT_CACHE_KEY = "notifications:unread_count:{uid}:{utype}"
-
-def _invalidate_user_cache(user_id: int, user_type: str):
-    # coarse invalidation (we don’t know flags/limits used), wipe both count + a wildcard for list
-    cache.delete(COUNT_CACHE_KEY.format(uid=user_id, utype=user_type))
-    # Optional: delete_many of common limits/flags to keep it simple & fast
-    for unread in (0, 1):
-        for limit in (10, 20, 50, 100):
-            cache.delete(LIST_CACHE_KEY.format(uid=user_id, utype=user_type, unread=unread, limit=limit))
 
 def _enforce_visibility_rules(user_type: str, ntype: str) -> bool:
     """
@@ -64,7 +53,7 @@ def create_otp_notification(*, user, user_type: str, phone: str, otp_code: str, 
         is_urgent=True,
         expires_at=expires_at,
     )
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
     return n
 
 @transaction.atomic
@@ -85,7 +74,7 @@ def create_order_created_notification(*, user, user_type: str, phone: str, order
                 else f"Your order status has been updated. Order ID: #{order_id} - {product_name}",
         is_urgent=False,
     )
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
     return n
 
 @transaction.atomic
@@ -115,7 +104,7 @@ def create_order_update_notification(*, user, user_type: str, phone: str, order_
                 f"Order ID: #{order_id} - {product_name}",
         is_urgent=is_urgent,
     )
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
     return n
 
 @transaction.atomic
@@ -129,7 +118,7 @@ def create_vendor_order_notification(*, vendor_user, vendor_phone: str, order_id
         message=f"You have a new order for {quantity}x {product_name} from {buyer_name}. Order ID: #{order_id}.",
         is_urgent=True,
     )
-    _invalidate_user_cache(vendor_user.id, UserTypes.VENDOR)
+    invalidate_user_cache(vendor_user.id, UserTypes.VENDOR)
     return n
 
 @transaction.atomic
@@ -156,7 +145,7 @@ def create_custom_notification(*, user, user_type: str, title: str, message: str
         is_urgent=is_urgent,
         expires_at=expires_at
     )
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
     return n
 
 def get_user_notifications(*, user, user_type: str, unread_only: bool = False, limit: int = 50, exclude_otp: bool = True):
@@ -235,13 +224,13 @@ def mark_as_read(notification_id: int, *, user=None):
                .filter(user=user) if user else InAppNotifications.objects.filter(id=notification_id)
                ).update(is_read=True)
     if user:
-        _invalidate_user_cache(user.id, getattr(user, 'role', '') or getattr(user, 'user_type', ''))
+        invalidate_user_cache(user.id, getattr(user, 'role', '') or getattr(user, 'user_type', ''))
     return updated
 
 @transaction.atomic
 def mark_all_as_read(*, user, user_type: str):
     InAppNotifications.objects.filter(user=user, user_type=user_type, is_read=False).update(is_read=True)
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
 
 def delete_expired_notifications():
     InAppNotifications.objects.filter(expires_at__lt=timezone.now()).delete()
@@ -255,13 +244,37 @@ def delete_notification(notification_id: int, *, user=None):
         return 0
     uid, utype = obj.user_id, obj.user_type
     deleted, _ = qs.delete()
-    _invalidate_user_cache(uid, utype)
+    invalidate_user_cache(uid, utype)
     return deleted
 
 def delete_all_for_user(*, user, user_type: str):
     InAppNotifications.objects.filter(user=user, user_type=user_type).delete()
-    _invalidate_user_cache(user.id, user_type)
+    invalidate_user_cache(user.id, user_type)
 
 def create_app_update_for_all_users(title: str, message: str, version: str | None = None):
-    """Fan-out via Celery task (batch insert) to avoid blocking."""
-    fanout_app_update_task.delay(title, message, version or "")
+    """Direct implementation without Celery to avoid circular imports."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    
+    notifications = []
+    users_to_invalidate = []
+    
+    for user in User.objects.all():
+        user_type = getattr(user, 'user_type', UserTypes.BUYER)
+        notifications.append(InAppNotifications(
+            user=user,
+            user_type=user_type,
+            phone=getattr(user, 'phone', ''),
+            type=NotificationTypes.APP_UPDATE,
+            title=title,
+            message=message,
+            is_urgent=False
+        ))
+        users_to_invalidate.append((user.id, user_type))
+    
+    if notifications:
+        InAppNotifications.objects.bulk_create(notifications, batch_size=100)
+        
+        # Invalidate cache for all users
+        for user_id, user_type in users_to_invalidate:
+            invalidate_user_cache(user_id, user_type)
