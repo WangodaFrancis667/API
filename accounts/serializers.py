@@ -21,14 +21,14 @@ import logging
 logger = logging.getLogger('accounts.security')
 
 
-# Serializer for adding an email
+# Serializer for adding an email to the account for 2FA
 class AddEmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
         value = value.lower()
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("This email is already in use.")
+            raise serializers.ValidationError("This email is already in use, Please use a different one.")
         return value
 
     def save(self, **kwargs):
@@ -63,7 +63,7 @@ class UserRegistrationSerializer(serializers.Serializer):
         }
     
     def validate_email(self, value):
-        # Validat eemail format and uniqueness
+        # Validate email format and uniqueness
         if User.objects.filter(email=value.lower()).exists():
             raise serializers.ValidationError('A user with this email already exists')
         return value.lower()
@@ -153,6 +153,7 @@ class UserRegistrationSerializer(serializers.Serializer):
         return user
 
 
+# Vendor registration serializer by admins
 class VendorRegistrationSerializer(serializers.Serializer):
     """
     Serializer for vendor registration by admins only.
@@ -230,6 +231,7 @@ class VendorRegistrationSerializer(serializers.Serializer):
         return user
     
 
+# User Login serializer
 class UserLoginSerializer(serializers.Serializer):
     """
     Serializer for user login with security checks.
@@ -310,6 +312,7 @@ class UserLoginSerializer(serializers.Serializer):
             pass  # Don't reveal if username exists
 
 
+# Profule update
 class ProfileUpdateSerializer(serializers.Serializer):
     """
     Serializer for updating user profile information, including role-specific profile details.
@@ -448,7 +451,8 @@ class ProfileUpdateSerializer(serializers.Serializer):
 
         return instance     
 
-    
+
+# View profile    
 class UserProfileSerializer(serializers.Serializer):
     """
     Serializer for user profile with role-specific information.
@@ -517,7 +521,7 @@ class UserProfileSerializer(serializers.Serializer):
         return super().update(instance, validated_data)
 
 
-class PasswordChangeSerializer(serializers.Serializer):
+
     """
     Serializer for password change with validation.
     """
@@ -551,7 +555,8 @@ class PasswordChangeSerializer(serializers.Serializer):
         
         return user
   
-    
+
+# Admin user management    
 class AdminUserManagementSerializer(serializers.Serializer):
     """
     Serializer for admin user management operations.
@@ -576,6 +581,7 @@ class AdminUserManagementSerializer(serializers.Serializer):
         return value
     
 
+# User activity logs
 class UserActivityLogSerializer(serializers.Serializer):
     """
     Serializer for user activity logs.
@@ -640,7 +646,7 @@ class UserDeleteSerializer(serializers.Serializer):
         return {'success': True, 'message': 'Your account has been successfully deleted.'}
     
 
-# Password reset request
+# Password reset request via email
 class PasswordResetRequestSerializer(serializers.Serializer):
     """
     Serializer for requesting a password reset through email.
@@ -653,35 +659,9 @@ class PasswordResetRequestSerializer(serializers.Serializer):
             # Don't reveal if user exists for security
             pass
         return email
-    
-    # email_or_phone = serializers.CharField(required=True)
-    
-    # def validate(self, attrs):
-    #     email_or_phone = attrs.get('email_or_phone')
-        
-    #     # Check if input is email or phone
-    #     if '@' in email_or_phone:
-    #         # Looks like an email
-    #         if not User.objects.filter(email=email_or_phone.lower()).exists():
-    #             # We don't reveal whether the email exists for security reasons
-    #             # Just return without error and handle in view
-    #             pass
-    #         attrs['is_email'] = True
-    #     else:
-    #         # Looks like a phone number
-    #         # Clean phone number
-    #         phone_clean = re.sub(r'[^\d+]', '', email_or_phone)
-    #         if not User.objects.filter(phone=phone_clean).exists():
-    #             # We don't reveal whether the phone exists for security reasons
-    #             # Just return without error and handle in view
-    #             pass
-    #         attrs['is_email'] = False
-    #         attrs['email_or_phone'] = phone_clean
-            
-    #     return attrs
 
 
-# Password Verification
+# Password Verification via email reset
 class PasswordResetVerifySerializer(serializers.Serializer):
     """
     Serializer for verifying a password reset token.
@@ -715,12 +695,9 @@ class PasswordResetVerifySerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid email address.")
         
         return attrs
+    
 
-    # token = serializers.CharField(required=True)
-    # uidb64 = serializers.CharField(required=True)
-
-
-# Password reset confirmation
+# Password reset confirmation via email reset
 class PasswordResetConfirmSerializer(serializers.Serializer):
     """
     Serializer for confirming a password reset with a new password.
@@ -780,19 +757,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         reset.save()
         
         return user
-
-    # token = serializers.CharField(required=True)
-    # uidb64 = serializers.CharField(required=True)
-    # new_password = serializers.CharField(write_only=True, validators=[validate_password])
-    # new_password_confirm = serializers.CharField(write_only=True)
-    
-    # def validate(self, attrs):
-    #     """Validate passwords match."""
-    #     if attrs['new_password'] != attrs['new_password_confirm']:
-    #         raise serializers.ValidationError({"new_password_confirm": "Passwords don't match."})
-        
-    #     # Token validation will be done in the view
-    #     return attrs
 
 
 # Email sending verification
