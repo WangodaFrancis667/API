@@ -1,0 +1,334 @@
+# PRODUCT MANAGEMENT API ENDPOINTS - CURL COMMANDS
+# Base URL: http://localhost:8000/api/products
+# Authentication: JWT tokens required for most endpoints
+
+# ===============================
+# CATEGORIES ENDPOINTS
+# ===============================
+
+# 1. Get All Categories
+curl -X GET http://localhost:8000/api/products/categories/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# PRODUCT METADATA ENDPOINTS
+# ===============================
+
+# 2. Get All Product Metadata
+curl -X GET http://localhost:8000/api/products/metadata/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 3. Create Product Metadata (Admin Only)
+curl -X POST http://localhost:8000/api/products/metadata/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "category",
+    "name": "electronics",
+    "display_name": "Electronics",
+    "description": "Electronic devices and accessories",
+    "category_type": "physical",
+    "is_active": true,
+    "sort_order": 1
+  }'
+
+# 4. Create Unit Metadata (Admin Only)
+curl -X POST http://localhost:8000/api/products/metadata/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "unit",
+    "name": "kg",
+    "display_name": "Kilogram",
+    "description": "Weight measurement in kilograms",
+    "is_active": true,
+    "sort_order": 1
+  }'
+
+# 5. Get Product Metadata by ID
+curl -X GET http://localhost:8000/api/products/metadata/1/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 6. Update Product Metadata (Admin Only)
+curl -X PUT http://localhost:8000/api/products/metadata/1/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "category",
+    "name": "electronics_updated",
+    "display_name": "Electronics & Gadgets",
+    "description": "Updated description for electronics",
+    "is_active": true,
+    "sort_order": 2
+  }'
+
+# 7. Get Metadata by Type
+curl -X GET http://localhost:8000/api/products/metadata/type/category/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+curl -X GET http://localhost:8000/api/products/metadata/type/unit/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 8. Clear Metadata Cache (Admin Only)
+curl -X POST http://localhost:8000/api/products/metadata/clear-cache/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# PRODUCT CRUD ENDPOINTS
+# ===============================
+
+# 9. Create Product (Vendor/Admin Only)
+curl -X POST http://localhost:8000/api/products/create/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "iPhone 15 Pro",
+    "description": "Latest iPhone with advanced features",
+    "regular_price": "999.00",
+    "group_price": "950.00",
+    "min_quantity": 1,
+    "unit": "piece",
+    "category": 1,
+    "is_active": true
+  }'
+
+# 10. Create Product with Agricultural Items
+curl -X POST http://localhost:8000/api/products/create/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Fresh Tomatoes",
+    "description": "Organic farm-fresh tomatoes",
+    "regular_price": "3.50",
+    "group_price": "3.00",
+    "min_quantity": 10,
+    "unit": "kg",
+    "category": 2,
+    "is_active": true
+  }'
+
+# 11. Update Product (Vendor/Admin Only)
+curl -X PUT http://localhost:8000/api/products/1/update/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "iPhone 15 Pro Max",
+    "description": "Updated iPhone with premium features",
+    "regular_price": "1099.00",
+    "group_price": "1050.00",
+    "min_quantity": 1,
+    "unit": "piece",
+    "category": 1,
+    "is_active": true
+  }'
+
+# 12. Soft Delete Product (Vendor/Admin Only)
+curl -X DELETE http://localhost:8000/api/products/1/delete/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN"
+
+# 13. Hard Delete Product (Admin Only)
+curl -X DELETE http://localhost:8000/api/products/1/hard-delete/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# ===============================
+# PRODUCT VIEWING ENDPOINTS
+# ===============================
+
+# 14. Get All Products (Full View)
+curl -X GET http://localhost:8000/api/products/view-products/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 15. Get Products with Pagination
+curl -X GET "http://localhost:8000/api/products/view-products/?limit=10&offset=0" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 16. Filter Products by Category
+curl -X GET "http://localhost:8000/api/products/view-products/?category=1" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 17. Filter Products by Vendor
+curl -X GET "http://localhost:8000/api/products/view-products/?vendor=2" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 18. Search Products by Title
+curl -X GET "http://localhost:8000/api/products/view-products/?search=iPhone" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 19. Get Product Details by ID
+curl -X GET http://localhost:8000/api/products/product-details/1/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 20. Get Simple Product List
+curl -X GET http://localhost:8000/api/products/product-list/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 21. Get Product with Images
+curl -X GET http://localhost:8000/api/products/1/with-images/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# PRODUCT IMAGE ENDPOINTS
+# ===============================
+
+# 22. Get All Images for a Product
+curl -X GET http://localhost:8000/api/products/1/images/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 23. Add Image to Product (Vendor/Admin Only)
+curl -X POST http://localhost:8000/api/products/1/images/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_url": "uploads/products/iphone15_front.jpg"
+  }'
+
+# 24. Upload Image File (multipart/form-data)
+curl -X POST http://localhost:8000/api/products/1/images/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -F "image=@/path/to/product/image.jpg"
+
+# 25. Get Specific Product Image
+curl -X GET http://localhost:8000/api/products/1/images/1/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 26. Update Product Image (Vendor/Admin Only)
+curl -X PUT http://localhost:8000/api/products/1/images/1/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image_url": "uploads/products/iphone15_updated.jpg",
+    "is_active": true
+  }'
+
+# 27. Delete Product Image (Vendor/Admin Only)
+curl -X DELETE http://localhost:8000/api/products/1/images/1/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN"
+
+# ===============================
+# BULK IMAGE UPLOAD
+# ===============================
+
+# 28. Bulk Upload Images to Product
+curl -X POST http://localhost:8000/api/products/images/bulk-upload/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_id": 1,
+    "image_urls": [
+      "uploads/products/product1_img1.jpg",
+      "uploads/products/product1_img2.jpg",
+      "uploads/products/product1_img3.jpg"
+    ]
+  }'
+
+# 29. Bulk Upload with Files (multipart/form-data)
+curl -X POST http://localhost:8000/api/products/images/bulk-upload/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -F "product_id=1" \
+  -F "images=@/path/to/image1.jpg" \
+  -F "images=@/path/to/image2.jpg" \
+  -F "images=@/path/to/image3.jpg"
+
+# ===============================
+# ADVANCED FILTERING & SORTING
+# ===============================
+
+# 30. Get Products with Price Range Filter
+curl -X GET "http://localhost:8000/api/products/view-products/?min_price=10&max_price=100" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 31. Sort Products by Price (Ascending)
+curl -X GET "http://localhost:8000/api/products/view-products/?ordering=regular_price" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 32. Sort Products by Price (Descending)
+curl -X GET "http://localhost:8000/api/products/view-products/?ordering=-regular_price" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 33. Sort Products by Date Created (Newest First)
+curl -X GET "http://localhost:8000/api/products/view-products/?ordering=-created_at" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 34. Filter Active Products Only
+curl -X GET "http://localhost:8000/api/products/view-products/?is_active=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# 35. Complex Query - Category + Price Range + Active
+curl -X GET "http://localhost:8000/api/products/view-products/?category=1&min_price=500&max_price=1500&is_active=true&ordering=-created_at" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# ===============================
+# VENDOR-SPECIFIC ENDPOINTS
+# ===============================
+
+# 36. Get Vendor's Own Products
+curl -X GET "http://localhost:8000/api/products/view-products/?vendor=me" \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN"
+
+# 37. Get Vendor's Product Statistics
+curl -X GET http://localhost:8000/api/products/vendor/stats/ \
+  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN"
+
+# ===============================
+# ADMIN-SPECIFIC ENDPOINTS
+# ===============================
+
+# 38. Get All Products (Including Inactive) - Admin Only
+curl -X GET "http://localhost:8000/api/products/view-products/?include_inactive=true" \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+# 39. Bulk Product Status Update (Admin Only)
+curl -X PATCH http://localhost:8000/api/products/bulk-status-update/ \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_ids": [1, 2, 3],
+    "is_active": false
+  }'
+
+# ===============================
+# ERROR HANDLING EXAMPLES
+# ===============================
+
+# Common HTTP Status Codes:
+# - 200: Success
+# - 201: Created successfully
+# - 400: Bad request (validation errors)
+# - 401: Unauthorized (invalid/missing token)
+# - 403: Forbidden (insufficient permissions - not vendor/admin)
+# - 404: Product/Category not found
+# - 409: Conflict (duplicate product names, etc.)
+# - 413: Payload too large (image file too big)
+# - 429: Too many requests (rate limited)
+
+# Example validation error response:
+# {
+#   "error": "Validation failed",
+#   "details": {
+#     "regular_price": ["Ensure this value is greater than 0."],
+#     "category": ["This field is required."]
+#   }
+# }
+
+# ===============================
+# NOTES & BEST PRACTICES
+# ===============================
+
+# 1. File Upload Considerations:
+#    - Maximum image size: Usually limited (e.g., 5MB)
+#    - Supported formats: JPG, PNG, WebP
+#    - Images are typically stored in /media/uploads/products/
+
+# 2. Permissions:
+#    - Vendors can only manage their own products
+#    - Admins can manage all products
+#    - Buyers can only view active products
+
+# 3. Caching:
+#    - Categories and metadata are cached for performance
+#    - Clear cache after metadata updates
+
+# 4. Price Handling:
+#    - Prices are stored as decimal with 2 decimal places
+#    - Always include both regular_price and group_price
+#    - Group pricing enables bulk purchase discounts
