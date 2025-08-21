@@ -41,7 +41,7 @@ from .serializers import (
     UserDeleteSerializer, ProfileUpdateSerializer, 
     UserRegistrationSerializer, VendorRegistrationSerializer,
     UserLoginSerializer, ProfileUpdateSerializer,
-    UserProfileSerializer, PasswordChangeSerializer,
+    UserProfileSerializer,
     AdminUserManagementSerializer, UserActivityLogSerializer,
     SendEmailVerificationSerializer, ConfirmEmailVerificationSerializer,
     AddEmailSerializer,
@@ -81,6 +81,7 @@ def serialize_obj(obj):
     return None
 
 
+# Getting the status of the authenticated user
 @api_view(['GET'])
 def status_view(request):
     if not request.user.is_authenticated:
@@ -410,6 +411,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         
         return response
     
+
+# Password reset request
 class PasswordResetRequestView(generics.GenericAPIView):
     """
     Request a password reset code via email.
@@ -426,7 +429,7 @@ class PasswordResetRequestView(generics.GenericAPIView):
             # --- Rate limiting per user (email-based) ---
             # At most 10 reset requests per hour per email
             user_rate_key = f"password_reset_user:{email}"
-            if not check_rate_limit(user_rate_key, 10, 3600):  
+            if not check_rate_limit(user_rate_key, 10, 3600):  # Utmost 10 requests per hour
                 return Response(
                     {"detail": "Too many password reset attempts. Please try again later."},
                     status=status.HTTP_429_TOO_MANY_REQUESTS
@@ -478,78 +481,7 @@ class PasswordResetRequestView(generics.GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-                
-    #         # Try to get the user
-    #         try:
-    #             if is_email:
-    #                 user = User.objects.get(email=email_or_phone.lower())
-    #             else:
-    #                 user = User.objects.get(phone=email_or_phone)
-                
-    #             # Generate token
-    #             token = default_token_generator.make_token(user)
-    #             uid = urlsafe_base64_encode(force_bytes(user.pk))
-    #             reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
-                
-    #             # Send notification (email or SMS)
-    #             if is_email and user.email:
-    #                 self._send_reset_email(user, reset_url)
-    #             elif user.phone:
-    #                 self._send_reset_sms(user, reset_url)
-                
-    #             # Log activity
-    #             log_user_activity(
-    #                 user,
-    #                 'PASSWORD_RESET_REQUEST',
-    #                 f"Password reset requested via {'email' if is_email else 'phone'}",
-    #                 request
-    #             )
-                
-    #         except User.DoesNotExist:
-    #             # We don't reveal if the user exists for security
-    #             pass
-            
-    #         # Always return success to prevent enumeration attacks
-    #         return Response(
-    #             {"detail": "If a matching account was found, a password reset link has been sent."},
-    #             status=status.HTTP_200_OK
-    #         )
-            
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-    # def _send_reset_email(self, user, reset_url):
-    #     """Send password reset email."""
-    #     subject = f"{settings.SITE_NAME} - Password Reset"
-    #     html_message = render_to_string('accounts/password_reset_email.html', {
-    #         'user': user,
-    #         'reset_url': reset_url,
-    #         'site_name': settings.SITE_NAME,
-    #         'valid_hours': 24
-    #     })
-    #     plain_message = f"Password Reset Link: {reset_url}\nValid for 24 hours."
-        
-    #     try:
-    #         send_mail(
-    #             subject=subject,
-    #             message=plain_message,
-    #             from_email=settings.DEFAULT_FROM_EMAIL,
-    #             recipient_list=[user.email],
-    #             html_message=html_message,
-    #             fail_silently=False,
-    #         )
-    #         logger.info(f"Password reset email sent to: {user.email}")
-    #     except Exception as e:
-    #         logger.error(f"Failed to send password reset email: {str(e)}")
-    
-    # def _send_reset_sms(self, user, reset_url):
-    #     """Send password reset SMS."""
-    #     # Implement SMS sending logic here
-    #     # This is just a placeholder - you'll need to integrate with an SMS service
-    #     message = f"{settings.SITE_NAME}: Reset your password with this link: {reset_url}"
-    #     logger.info(f"Password reset SMS would be sent to: {user.phone}")
-    #     # In a real implementation, call your SMS service here
-
-
+# Verifying the validity of the reset token
 class PasswordResetVerifyView(generics.GenericAPIView):
     """
     Verify a password reset token is valid.
@@ -601,6 +533,7 @@ class PasswordResetVerifyView(generics.GenericAPIView):
     #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# Confirming the password reset
 class PasswordResetConfirmView(generics.GenericAPIView):
     """
     Reset password with a valid verification code.
@@ -641,60 +574,9 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    # def post(self, request):
-    #     serializer = self.get_serializer(data=request.data)
-        
-    #     if serializer.is_valid():
-    #         token = serializer.validated_data['token']
-    #         uidb64 = serializer.validated_data['uidb64']
-    #         new_password = serializer.validated_data['new_password']
-            
-    #         try:
-    #             uid = force_str(urlsafe_base64_decode(uidb64))
-    #             user = User.objects.get(pk=uid)
-                
-    #             if default_token_generator.check_token(user, token):
-    #                 # Set new password
-    #                 user.set_password(new_password)
-                    
-    #                 # Reset account security
-    #                 user.login_attempts = 0
-    #                 if user.is_account_locked():
-    #                     user.unlock_account()
-                    
-    #                 user.save()
-                    
-    #                 # Log activity
-    #                 log_user_activity(
-    #                     user,
-    #                     'PASSWORD_RESET_COMPLETE',
-    #                     "Password reset completed successfully",
-    #                     request
-    #                 )
-                    
-    #                 # Invalidate user cache
-    #                 invalidate_user_cache(user.id)
-                    
-    #                 return Response(
-    #                     {"detail": "Password has been reset successfully."},
-    #                     status=status.HTTP_200_OK
-    #                 )
-                
-    #             return Response(
-    #                 {"detail": "Invalid or expired token."},
-    #                 status=status.HTTP_400_BAD_REQUEST
-    #             )
-                
-    #         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-    #             return Response(
-    #                 {"detail": "Invalid reset link."},
-    #                 status=status.HTTP_400_BAD_REQUEST
-    #             )
-                
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 # Admin vendor registration view
+# Used to register the vendors onto the app
 class VendorRegistrationView(generics.GenericAPIView):
     """
     Vendor registration endpoint (Admin only).
@@ -735,6 +617,7 @@ class VendorRegistrationView(generics.GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# This is an admin user management view for all the users
 class AdminUserManagementView(generics.ListCreateAPIView):
     """
     Admin endpoint for user management.
@@ -769,6 +652,7 @@ class AdminUserManagementView(generics.ListCreateAPIView):
         return queryset.order_by('-date_joined')
 
 
+# Individual user maanagement view by the admin
 class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     Admin endpoint for individual user management.
@@ -834,6 +718,7 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
 
+# Vendor verification endpoint
 class VendorVerificationView(APIView):
     """
     Admin endpoint for vendor verification.
@@ -895,6 +780,7 @@ class VendorVerificationView(APIView):
             )
 
 
+# User activity logging for user actions
 class UserActivityLogView(generics.ListAPIView):
     """
     View user activity logs (Admin can see all, users can see their own).
@@ -924,6 +810,7 @@ class UserActivityLogView(generics.ListAPIView):
         return queryset.order_by('-created_at')
 
 
+# Dashboard statistics view for admin management
 class DashboardStatsView(APIView):
     """
     Dashboard statistics with caching.
@@ -994,6 +881,7 @@ class DashboardStatsView(APIView):
         return int((completed / len(fields)) * 100)
 
 
+# Current user permissions
 @csrf_exempt
 def user_permissions(request):
     """
@@ -1052,13 +940,13 @@ class SendEmailVerificationView(generics.GenericAPIView):
             status=status.HTTP_200_OK
         )
 
+
 # Email Confirmation
 class ConfirmEmailVerificationView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = ConfirmEmailVerificationSerializer(data=request.data, context={'request': request})
-        # serializer = ConfirmEmailVerificationSerializer(data=request.data)
 
         with transaction.atomic():
             serializer.is_valid(raise_exception=True)
@@ -1075,6 +963,6 @@ class AddEmailView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "Email added successfully. Now send verification."}, status=status.HTTP_200_OK)
+        return Response({"detail": "Email added successfully."}, status=status.HTTP_200_OK)
     
 
