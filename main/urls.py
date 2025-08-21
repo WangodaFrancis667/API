@@ -40,6 +40,9 @@ urlpatterns = [
     # notifications
     path('api/notifications/', include('notifications.urls')),
 
+    # orders
+    path("api/orders/", include("orders.urls")),
+
     # Add this line for DRF browsable API login/logout
     # path('api-auth/', include('rest_framework.urls')),
 ]
