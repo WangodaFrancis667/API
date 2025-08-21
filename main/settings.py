@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'home_page',
     'productManagement',
     'app_settings',
+    'notifications',
 ]
 
 MIDDLEWARE = [
