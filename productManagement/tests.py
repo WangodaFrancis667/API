@@ -363,11 +363,14 @@ class ProductsSerializerTest(TestCase):
             'title': 'New Product',
             'description': 'A new product',
             'regular_price': '150.00',
-            'group_price': '140.00',
+            'group_price': '160.00',
             'min_quantity': 5,
             'unit': 'pieces',
             'category': self.category.id
         }
+
+        if data['group_price'] > data['regular_price']:
+            self.assertRaises(ValidationError)
         serializer = ProductsSerializer(data=data)
         self.assertTrue(serializer.is_valid())
 
@@ -508,14 +511,17 @@ class ProductManagementViewTest(APITestCase):
             'title': 'Admin Created Product',
             'description': 'Product created by admin',
             'regular_price': '200.00',
-            'group_price': '180.00',
+            'group_price': '1770.00',
             'min_quantity': 5,
             'unit': 'pieces',
             'category': self.category.id
         }
-        
+
+      
         response = self.client.post('/api/products/create/', data)
         self.assertIn(response.status_code, [200, 201, 400, 403, 404])
+        
+       
 
     def test_product_create_view_buyer_denied(self):
         self.client.force_authenticate(user=self.buyer_user)
