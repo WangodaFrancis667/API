@@ -117,14 +117,19 @@ class ProductMetaDataSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'id': {'read_only': True}
+        }
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        validated_data.pop('id', None)
+        return super().create(validated_data)
 
     def validate_type(self, value):
-        """Ensure type is one of the valid choices"""
         if value not in [choice[0] for choice in ProductMetaData.TypeChoices.choices]:
             raise serializers.ValidationError("Invalid type choice")
         return value
-
 
 class ProductMetaDataListSerializer(serializers.ModelSerializer):
     """Lighter serializer for list views"""
