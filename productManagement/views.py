@@ -42,6 +42,7 @@ from accounts.security import (
     get_user_dashboard_url
 )
 
+
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -58,7 +59,7 @@ class CategoriesListView(generics.ListAPIView):
 
         try:
             # If cache miss or Redis down, fetch from DB
-            queryset = Categories.objects.get()#filter(is_active=True)
+            queryset = Categories.objects.filter(is_active=True)
             serializer = CategoriesSerializer(queryset, many=True)
             data = serializer.data
 
@@ -134,6 +135,21 @@ class ProductCreateView(generics.CreateAPIView):
     serializer_class = ProductsSerializer
     parser_classes = [MultiPartParser, FormParser]
 
+    def get_serializer(self, *args, **kwargs):
+        """Override to automatically set the vendor field"""
+        serializer_class = self.get_serializer_class()
+        kwargs.setdefault('context', self.get_serializer_context())
+        
+        # If this is for creation (POST), add vendor to the data
+        if self.request.method == 'POST' and 'data' in kwargs:
+            data = kwargs['data'].copy() if hasattr(kwargs['data'], 'copy') else kwargs['data']
+            # Set vendor to current user's ID
+            data['vendor'] = self.request.user.id
+            kwargs['data'] = data
+        
+        return serializer_class(*args, **kwargs)
+
+
     def perform_create(self, serializer):
         user = self.request.user
 
@@ -176,10 +192,27 @@ class ProductCreateView(generics.CreateAPIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            if request.data['group_price'] >= request.data['regular_price']:
-                return Response(
-                    {"error": "The group price must be less that the regular price"}
-                )
+            
+            # Handle both regular price and group price validation
+            regular_price = request.data.get('regular_price')
+            group_price = request.data.get('group_price')
+            
+            if regular_price and group_price:
+                try:
+                    regular_price_float = float(regular_price)
+                    group_price_float = float(group_price)
+                    
+                    if group_price_float >= regular_price_float:
+                        return Response(
+                            {"error": "The group price must be less than the regular price"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except (ValueError, TypeError):
+                    return Response(
+                        {"error": "Invalid price format. Please provide valid numbers."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             
             # Process the creation
             serializer = self.get_serializer(data=request.data)
