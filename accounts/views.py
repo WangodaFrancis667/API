@@ -364,7 +364,7 @@ class ProfileUpdateView(APIView):
     """
     permission_classes = [IsAuthenticated]
     
-    def patch(self, request):
+    def put(self, request):
         serializer = ProfileUpdateSerializer(
             instance=request.user,
             data=request.data,
