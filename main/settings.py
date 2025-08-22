@@ -33,7 +33,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1', '0.0.0.0']
 
 
 # Application definition
@@ -267,6 +267,7 @@ SECURE_HSTS_PRELOAD = True
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    # "http://0.0.0.0:8000",
 ]
 
 CELERY_BEAT_SCHEDULE = {
