@@ -98,6 +98,15 @@ class ProductsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def create(self, validated_data):
+        # If vendor is not provided, set it from the request user
+        if 'vendor' not in validated_data:
+            request = self.context.get('request')
+            if request and hasattr(request, 'user'):
+                validated_data['vendor'] = request.user
+        
+        return super().create(validated_data)
+
 
 class ProductMetaDataSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
