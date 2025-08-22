@@ -48,6 +48,7 @@ User = get_user_model()
 
 class CategoriesListView(generics.ListAPIView):
     permission_classes = [AllowAny]
+    serializer_class = CategoriesSerializer
 
     def get(self, request):
         # Try Redis cache first
@@ -57,7 +58,7 @@ class CategoriesListView(generics.ListAPIView):
 
         try:
             # If cache miss or Redis down, fetch from DB
-            queryset = Categories.objects.filter(is_active=True)
+            queryset = Categories.objects.get()#filter(is_active=True)
             serializer = CategoriesSerializer(queryset, many=True)
             data = serializer.data
 
@@ -129,8 +130,7 @@ class ProductFullView(generics.ListCreateAPIView):
 
 # View for creating the products
 class ProductCreateView(generics.CreateAPIView):
-    permission_classes = [AllowAny]
-    # permission_classes = [IsAuthenticated, IsAdminOrVendor]
+    permission_classes = [IsAuthenticated, IsAdminOrVendor]
     serializer_class = ProductsSerializer
     parser_classes = [MultiPartParser, FormParser]
 
@@ -174,6 +174,11 @@ class ProductCreateView(generics.CreateAPIView):
                 return Response(
                     {"error": "Only admins and vendors can create products"}, 
                     status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if request.data['group_price'] >= request.data['regular_price']:
+                return Response(
+                    {"error": "The group price must be less that the regular price"}
                 )
             
             # Process the creation
@@ -634,12 +639,15 @@ class ProductMetaDataListCreateView(generics.ListCreateAPIView):
     
     def _clear_metadata_cache(self):
         """Clear all ProductMetaData related cache"""
-        redis_conn = get_redis_connection("default")
-        cache_pattern = "productmetadata_*"
-        keys = redis_conn.keys(cache_pattern)
-        if keys:
-            redis_conn.delete(*keys)
-            logger.info(f"Cleared {len(keys)} cache keys matching {cache_pattern}")
+        try:
+            redis_conn = get_redis_connection("default")
+            cache_pattern = "productmetadata_*"
+            keys = redis_conn.keys(cache_pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                logger.info(f"Cleared {len(keys)} cache keys matching {cache_pattern}")
+        except Exception as e:
+            logger.info(f"Error clearing cache: {str(e)}")
 
 
 class ProductMetaDataDetailView(generics.RetrieveUpdateDestroyAPIView):
