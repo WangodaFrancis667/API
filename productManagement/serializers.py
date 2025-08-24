@@ -98,6 +98,15 @@ class ProductsSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def create(self, validated_data):
+        # If vendor is not provided, set it from the request user
+        if 'vendor' not in validated_data:
+            request = self.context.get('request')
+            if request and hasattr(request, 'user'):
+                validated_data['vendor'] = request.user
+        
+        return super().create(validated_data)
+
 
 class ProductMetaDataSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
@@ -117,14 +126,19 @@ class ProductMetaDataSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'id': {'read_only': True}
+        }
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        validated_data.pop('id', None)
+        return super().create(validated_data)
 
     def validate_type(self, value):
-        """Ensure type is one of the valid choices"""
         if value not in [choice[0] for choice in ProductMetaData.TypeChoices.choices]:
             raise serializers.ValidationError("Invalid type choice")
         return value
-
 
 class ProductMetaDataListSerializer(serializers.ModelSerializer):
     """Lighter serializer for list views"""

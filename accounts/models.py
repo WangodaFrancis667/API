@@ -217,7 +217,7 @@ class User(AbstractUser):
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
 
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, blank=True, null=True)
     role = models.CharField(max_length=20, choices=ROLES_DATA, db_index=True)
 
     # Enhanced profile fields
@@ -267,6 +267,9 @@ class User(AbstractUser):
     
     def save(self, *args, **kwargs):
         # Clear first name and last name if full_name is provided
+        if self.email == '':
+            self.email = None
+            
         if self.full_name:
             self.first_name = ""
             self.last_name = ""

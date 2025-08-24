@@ -79,17 +79,16 @@ curl -X POST http://localhost:8000/api/products/metadata/clear-cache/ \
 
 # 9. Create Product (Vendor/Admin Only)
 curl -X POST http://localhost:8000/api/products/create/ \
-  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU1ODYxOTE0LCJpYXQiOjE3NTU4NTgzMTQsImp0aSI6IjEyOTU3ZDBmZWNkOTQ2OTlhYzM1YmIyYmZjNGFjODc3IiwidXNlcl9pZCI6IjkifQ.HsNmSXiN09YPkpGFABBcvdisDo5wm7jQBuVWAtWDGP0" \
   -d '{
-    "title": "iPhone 15 Pro",
-    "description": "Latest iPhone with advanced features",
-    "regular_price": "999.00",
-    "group_price": "950.00",
-    "min_quantity": 1,
-    "unit": "piece",
-    "category": 1,
-    "is_active": true
+  -F "title": "iPhone 15 Pro",
+  -F  "description": "Latest iPhone with advanced features",
+  -F  "regular_price": "999.00",
+  -F  "group_price": "950.00",
+  -F  "min_quantity": 1,
+  -F  "unit": "piece",
+  -F  "category": 1,
+  -F  "is_active": true
   }'
 
 # 10. Create Product with Agricultural Items

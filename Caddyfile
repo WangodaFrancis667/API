@@ -1,0 +1,59 @@
+# Caddyfile for API production deployment
+# Replace yourdomain.com with your actual domain
+
+afrobuyug.com {
+    # Reverse proxy to Django application
+    reverse_proxy django:8000
+    
+    # Enable compression
+    encode gzip
+    
+    # Security headers
+    header {
+        # Enable HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+        
+        # Prevent MIME sniffing
+        X-Content-Type-Options "nosniff"
+        
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        
+        # Remove server info
+        -Server
+    }
+    
+    # Static file handling (if you have static files)
+    handle_path /static/* {
+        root * /app/staticfiles
+        file_server
+    }
+    
+    # Media file handling (if you have media files)
+    handle_path /media/* {
+        root * /app/media
+        file_server
+    }
+    
+    # Logging
+    log {
+        output file /data/access.log
+        format json
+    }
+}
+
+# HTTP to HTTPS redirect (optional, Caddy does this automatically)
+http://afrobuyug.com {
+    redir https://afrobuyug.com{uri}
+}
+
+# Optional: allow plain HTTP for quick checks
+:80 {
+    respond "ok" 200
+}

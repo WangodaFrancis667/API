@@ -1,0 +1,56 @@
+version: "3.9"
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+services:
+  django:
+    build: .
+    image: api-django:latest
+    command: gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+
+  celery_worker:
+    image: api-django:latest
+    env_file:
+      - .env
+    command: celery -A main worker -l info -Q default -c 2
+    depends_on:
+      - redis
+      - django
+    restart: unless-stopped
+
+  celery_beat:
+    image: api-django:latest
+    env_file:
+      - .env
+    command: celery -A main beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      - redis
+      - django
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - django
