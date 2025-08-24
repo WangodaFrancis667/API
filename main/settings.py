@@ -31,9 +31,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG')
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes', 'on')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1', '0.0.0.0', 'afrobuyug.com', 'api.afrobuyug.com']
 
 
 # Application definition
@@ -162,8 +162,35 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+# STATIC_URL = 'static/'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Static files
+USE_S3 = os.getenv("USE_S3", "false").lower() == "true"
+if USE_S3:
+    try:
+        import storages  # Check if storages is available
+        INSTALLED_APPS += ["storages"]
+        AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+        AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+        AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com")
+
+        STORAGES = {
+            "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+            "staticfiles": {"BACKEND": "storages.backends.s3boto3.S3StaticStorage"},
+        }
+    except ImportError:
+        # Fallback to local storage if storages is not installed
+        USE_S3 = False
+
+if not USE_S3:
+    # Use WhiteNoise for local static file serving
+    MIDDLEWARE = [
+        "whitenoise.middleware.WhiteNoiseMiddleware",
+        *MIDDLEWARE,
+    ]
+    STATIC_ROOT = Path(BASE_DIR, "staticfiles")
+    STATIC_URL = "/static/"
 
 # Media files
 MEDIA_URL = "https://api.afrobuyug.com/"
@@ -256,6 +283,10 @@ CELERY_TIMEZONE = "UTC"
 #     }
 
 # Security Settings
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
