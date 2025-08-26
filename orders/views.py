@@ -26,47 +26,52 @@ class CreateOrderView(generics.GenericAPIView):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
-        if data.get("is_group_order"):
-            order, go = create_or_join_group_order(
-                buyer_id=data["buyer_id"],
-                vendor_id=data["vendor_id"],
-                product_id=data["item"]["product_id"],
-                quantity=data["item"]["quantity"],
-                unit_price=data["item"]["unit_price"],
-                payment_method=data["payment_method"],
-                delivery_address=data["delivery_address"],
-                subtotal=data["subtotal"],
-                delivery_fee=data["delivery_fee"],
-                total_amount=data["total_amount"],
-            )
-            payload = {
-                "order_id": order.id,
-                "group_id": order.group_id,
-                "total_amount": str(order.total_amount),
-                "payment_method": order.payment_method,
-                "is_group_order": True,
-            }
-        else:
-            order = create_individual_order(
-                buyer_id=data["buyer_id"],
-                vendor_id=data["vendor_id"],
-                product_id=data["item"]["product_id"],
-                quantity=data["item"]["quantity"],
-                unit_price=data["item"]["unit_price"],
-                payment_method=data["payment_method"],
-                delivery_address=data["delivery_address"],
-                subtotal=data["subtotal"],
-                delivery_fee=data["delivery_fee"],
-                total_amount=data["total_amount"],
-            )
-            payload = {
-                "order_id": order.id,
-                "group_id": order.group_id,
-                "total_amount": str(order.total_amount),
-                "payment_method": order.payment_method,
-                "is_group_order": False,
-            }
+        try:
+            if data.get("is_group_order"):
+                order, go = create_or_join_group_order(
+                    buyer_id=data["buyer_id"],
+                    vendor_id=data["vendor_id"],
+                    product_id=data["item"]["product_id"],
+                    quantity=data["item"]["quantity"],
+                    unit_price=data["item"]["unit_price"],
+                    payment_method=data["payment_method"],
+                    delivery_address=data["delivery_address"],
+                    subtotal=data["subtotal"],
+                    delivery_fee=data["delivery_fee"],
+                    total_amount=data["total_amount"],
+                )
+                payload = {
+                    "order_id": order.id,
+                    "group_id": order.group_id,
+                    "total_amount": str(order.total_amount),
+                    "payment_method": order.payment_method,
+                    "is_group_order": True,
+                }
+            else:
+                order = create_individual_order(
+                    buyer_id=data["buyer_id"],
+                    vendor_id=data["vendor_id"],
+                    product_id=data["item"]["product_id"],
+                    quantity=data["item"]["quantity"],
+                    unit_price=data["item"]["unit_price"],
+                    payment_method=data["payment_method"],
+                    delivery_address=data["delivery_address"],
+                    subtotal=data["subtotal"],
+                    delivery_fee=data["delivery_fee"],
+                    total_amount=data["total_amount"],
+                )
+                payload = {
+                    "order_id": order.id,
+                    "group_id": order.group_id,
+                    "total_amount": str(order.total_amount),
+                    "payment_method": order.payment_method,
+                    "is_group_order": False,
+                }
+        except ValueError as e:
+            return Response(
+                    {"status": "error", "message": str(e)},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         return Response({"status": "success", "message": "Order placed successfully", "data": payload},
                         status=status.HTTP_201_CREATED)
