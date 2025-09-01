@@ -1,0 +1,1859 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6",
+		"name": "Complete API Collection - Django REST API",
+		"description": "Comprehensive Postman collection for the Django REST API with JWT authentication, supporting Admin, Vendor, and Buyer roles. Includes all endpoints for authentication, products, orders, payments, notifications, earnings, and more.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-refresh token if needed",
+					"const accessToken = pm.environment.get('access_token');",
+					"const refreshToken = pm.environment.get('refresh_token');",
+					"",
+					"if (!accessToken && refreshToken) {",
+					"    console.log('Attempting to refresh token...');",
+					"    pm.sendRequest({",
+					"        url: pm.environment.get('base_url') + '/api/auth/token/refresh/',",
+					"        method: 'POST',",
+					"        header: {",
+					"            'Content-Type': 'application/json'",
+					"        },",
+					"        body: {",
+					"            mode: 'raw',",
+					"            raw: JSON.stringify({",
+					"                'refresh': refreshToken",
+					"            })",
+					"        }",
+					"    }, (err, res) => {",
+					"        if (err) {",
+					"            console.log('Token refresh failed:', err);",
+					"        } else if (res.code === 200) {",
+					"            const newAccessToken = res.json().access;",
+					"            pm.environment.set('access_token', newAccessToken);",
+					"            console.log('Token refreshed successfully');",
+					"        }",
+					"    });",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-store tokens from auth responses",
+					"if (pm.response.code === 200 || pm.response.code === 201) {",
+					"    try {",
+					"        const response = pm.response.json();",
+					"        ",
+					"        if (response.access) {",
+					"            pm.environment.set('access_token', response.access);",
+					"        }",
+					"        if (response.refresh) {",
+					"            pm.environment.set('refresh_token', response.refresh);",
+					"        }",
+					"        if (response.tokens && response.tokens.access) {",
+					"            pm.environment.set('access_token', response.tokens.access);",
+					"        }",
+					"        if (response.tokens && response.tokens.refresh) {",
+					"            pm.environment.set('refresh_token', response.tokens.refresh);",
+					"        }",
+					"        if (response.user && response.user.id) {",
+					"            pm.environment.set('user_id', response.user.id);",
+					"            pm.environment.set('user_role', response.user.role);",
+					"        }",
+					"    } catch (e) {",
+					"        // Non-JSON response, ignore",
+					"    }",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "{{base_url}}",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "🏥 Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health",
+						""
+					]
+				},
+				"description": "Basic health check endpoint to verify API is running"
+			},
+			"response": []
+		},
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "🔑 Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.access);",
+									"    pm.environment.set('refresh_token', response.refresh);",
+									"    pm.environment.set('user_id', response.user.id);",
+									"    pm.environment.set('user_role', response.user.role);",
+									"    pm.environment.set('current_username', response.user.username);",
+									"    console.log('✅ Logged in as:', response.user.username, '(' + response.user.role + ')');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{current_username}}\",\n    \"password\": \"{{current_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📝 Register Buyer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.tokens.access);",
+									"    pm.environment.set('refresh_token', response.tokens.refresh);",
+									"    pm.environment.set('user_id', response.user.id);",
+									"    pm.environment.set('user_role', response.user.role);",
+									"    console.log('✅ Registered successfully as:', response.user.username);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Test Buyer\",\n    \"username\": \"testbuyer{{$randomInt}}\",\n    \"phone\": \"+256700{{$randomInt}}\",\n    \"location\": \"Kampala\",\n    \"password\": \"TestPassword123!\",\n    \"confirm_password\": \"TestPassword123!\",\n    \"role\": \"buyer\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/signup/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"signup",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🔄 Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.access);",
+									"    console.log('✅ Token refreshed successfully');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/token/refresh/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"token",
+								"refresh",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📊 Get Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/status/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"status",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🚪 Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👤 User Profile Management",
+			"item": [
+				{
+					"name": "👁️ View Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"profile",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "✏️ Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Updated Name\",\n    \"location\": \"Updated Location\",\n    \"phone\": \"+256700123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/update-profile/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"update-profile",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📧 Add Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test{{$randomInt}}@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/add-email/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"add-email",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📨 Send Email Verification",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/email/send/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"email",
+								"send",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "✅ Confirm Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"verification_code\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/email/confirm/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"email",
+								"confirm",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🗑️ Delete Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password\": \"{{current_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/delete-account/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"delete-account",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔒 Password Management",
+			"item": [
+				{
+					"name": "📧 Request Password Reset",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/request/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"password-reset",
+								"request",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "✅ Verify Reset Code",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"verification_code\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/verify/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"password-reset",
+								"verify",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🔐 Confirm New Password",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"verification_code\": \"123456\",\n    \"new_password\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/confirm/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"password-reset",
+								"confirm",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👑 Admin Endpoints",
+			"item": [
+				{
+					"name": "👥 User Management",
+					"item": [
+						{
+							"name": "📋 List All Users",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/auth/admin/users/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"admin",
+										"users",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "👤 Get User Details",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/auth/admin/users/{{target_user_id}}/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"admin",
+										"users",
+										"{{target_user_id}}",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🏪 Create Vendor",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"username\": \"vendor{{$randomInt}}\",\n    \"full_name\": \"Test Vendor\",\n    \"email\": \"vendor{{$randomInt}}@example.com\",\n    \"phone\": \"+256700{{$randomInt}}\",\n    \"location\": \"Kampala\",\n    \"business_name\": \"Test Business\",\n    \"password\": \"VendorPass123!\",\n    \"role\": \"vendor\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/auth/admin/vendor/create/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"admin",
+										"vendor",
+										"create",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "✅ Verify Vendor",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"is_verified\": true,\n    \"verification_notes\": \"Vendor documents verified and approved\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/auth/admin/vendor/{{vendor_user_id}}/verify/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"admin",
+										"vendor",
+										"{{vendor_user_id}}",
+										"verify",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "📊 Dashboard & Analytics",
+					"item": [
+						{
+							"name": "📈 Dashboard Stats",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/auth/dashboard/stats/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"dashboard",
+										"stats",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "📋 Activity Logs",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/auth/activity-logs/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"auth",
+										"activity-logs",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "📦 Product Management",
+			"item": [
+				{
+					"name": "📂 Categories",
+					"item": [
+						{
+							"name": "📋 List Categories",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/categories/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"categories",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "🏪 Products",
+					"item": [
+						{
+							"name": "📋 List All Products",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/view-products/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"view-products",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🛍️ Get Product Details",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/product-details/{{product_id}}/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"product-details",
+										"{{product_id}}",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "➕ Create Product",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Test Product\",\n    \"description\": \"A test product for API testing\",\n    \"price\": \"29.99\",\n    \"category_id\": 1,\n    \"stock_quantity\": 100,\n    \"is_active\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/products/create/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"create",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "✏️ Update Product",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Updated Product Name\",\n    \"description\": \"Updated description\",\n    \"price\": \"39.99\",\n    \"stock_quantity\": 150\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/update/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"update",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🗑️ Soft Delete Product",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/delete/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"delete",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "💥 Hard Delete Product",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/hard-delete/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"hard-delete",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "📸 Product Images",
+					"item": [
+						{
+							"name": "📋 List Product Images",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/images/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"images",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "📤 Upload Product Image",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "image",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "alt_text",
+											"value": "Product image",
+											"type": "text"
+										},
+										{
+											"key": "is_primary",
+											"value": "true",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/images/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"images",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🗑️ Delete Product Image",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/{{product_id}}/images/{{image_id}}/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"{{product_id}}",
+										"images",
+										"{{image_id}}",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "🏷️ Product Metadata",
+					"item": [
+						{
+							"name": "📋 List Metadata",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/metadata/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"metadata",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🏷️ Get Metadata by Type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/products/metadata/type/{{metadata_type}}/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"metadata",
+										"type",
+										"{{metadata_type}}",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "➕ Create Metadata",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Test Metadata\",\n    \"metadata_type\": \"brand\",\n    \"description\": \"Test metadata for products\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/products/metadata/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"products",
+										"metadata",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🛒 Order Management",
+			"item": [
+				{
+					"name": "➕ Create Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    if (response.order && response.order.id) {",
+									"        pm.environment.set('order_id', response.order.id);",
+									"        console.log('✅ Order created with ID:', response.order.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": {{product_id}},\n    \"quantity\": 2,\n    \"delivery_address\": \"123 Test Street, Kampala\",\n    \"notes\": \"Please handle with care\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/create/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"create",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📋 List Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders/list/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"list",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🔄 Update Order Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": {{order_id}},\n    \"status\": \"shipped\",\n    \"notes\": \"Order has been shipped via DHL\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/status/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"status",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "↩️ Create Order Return",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": {{order_id}},\n    \"reason\": \"defective\",\n    \"description\": \"Product arrived damaged\",\n    \"refund_requested\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/return/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"return",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔔 Notifications",
+			"item": [
+				{
+					"name": "📋 List Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📊 Unread Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/unread-count/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"unread-count",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "✅ Mark as Read",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"notification_id\": {{notification_id}}\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/notifications/mark-read/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"mark-read",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "✅ Mark All as Read",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/mark-all-read/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"mark-all-read",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🗑️ Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"notification_id\": {{notification_id}}\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/notifications/delete/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"delete",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📱 Get Notifications by Phone",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/by-phone/?phone={{phone}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"by-phone",
+								""
+							],
+							"query": [
+								{
+									"key": "phone",
+									"value": "{{phone}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "➕ Create Custom Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Custom Notification\",\n    \"message\": \"This is a custom notification for testing\",\n    \"recipients\": [\"user1\", \"user2\"],\n    \"notification_type\": \"info\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/notifications/custom/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"custom",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💰 Earnings & Vendor Stats",
+			"item": [
+				{
+					"name": "📊 Vendor Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/stats/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"stats",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "💸 Vendor Transactions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/transactions/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"transactions",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "💰 Vendor Balance",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/balance/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"balance",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📈 Vendor Earnings List",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/earnings/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"earnings",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "💵 Vendor Payouts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/payouts/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"payouts",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🏢 All Vendors Stats (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/earnings/all-vendors/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"earnings",
+								"all-vendors",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💳 Eversend Payments",
+			"item": [
+				{
+					"name": "🔑 Core Endpoints",
+					"item": [
+						{
+							"name": "🎫 Get Eversend Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    const response = pm.response.json();",
+											"    if (response.access_token) {",
+											"        pm.environment.set('eversend_token', response.access_token);",
+											"        console.log('✅ Eversend token retrieved');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/payments/eversend/token/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"eversend",
+										"token",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "🔗 Eversend Webhook (Test)",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Eversend-Signature",
+										"value": "test_signature"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"eventType\": \"transaction.wallet.load.success\",\n    \"status\": \"success\",\n    \"transactionId\": \"test-txn-123\",\n    \"transactionRef\": \"ref-123\",\n    \"currency\": \"UGX\",\n    \"amount\": 10000,\n    \"customer\": {\n        \"uuid\": \"user-123\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/webhooks/eversend/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"webhooks",
+										"eversend",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "📥 Collections",
+					"item": [
+						{
+							"name": "💰 Calculate Collection Fees",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"amount\": 10000,\n    \"currency\": \"UGX\",\n    \"country\": \"UG\",\n    \"phone\": \"+256700123456\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/collections/fees/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"collections",
+										"fees",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "📱 Request OTP",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phone\": \"+256700123456\",\n    \"country\": \"UG\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/collections/otp/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"collections",
+										"otp",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "📱 Process MoMo Collection",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phone\": \"+256700123456\",\n    \"amount\": 10000,\n    \"currency\": \"UGX\",\n    \"country\": \"UG\",\n    \"otp\": \"1234\",\n    \"customer\": \"John Doe\",\n    \"uuid\": \"user-123\",\n    \"service_fee\": 500,\n    \"charges\": 100\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/collections/momo/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"collections",
+										"momo",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "📤 Payouts",
+					"item": [
+						{
+							"name": "💵 Get Payout Quotation",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"token\": \"{{eversend_token}}\",\n    \"country\": \"UG\",\n    \"amount\": 50000,\n    \"currency\": \"UGX\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/payout/payouts/quotation/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"payout",
+										"payouts",
+										"quotation",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "💸 Process Payout",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"token\": \"{{eversend_token}}\",\n    \"uuid\": \"{{user_id}}\",\n    \"phoneNumber\": \"+256700123456\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"country\": \"UG\",\n    \"serviceFee\": 1000,\n    \"totalAmount\": 50000\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/payments/payout/payouts/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"api",
+										"payments",
+										"payout",
+										"payouts",
+										""
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "⚙️ App Settings",
+			"item": [
+				{
+					"name": "📋 List App Settings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/app/app-settings/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app",
+								"app-settings",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🔧 Get App Setting Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/app/app-settings/{{setting_id}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app",
+								"app-settings",
+								"{{setting_id}}",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📱 App Updates & Versioning",
+			"item": [
+				{
+					"name": "🔄 Check Force Update",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/updates/force-update?platform={{platform}}&version={{app_version}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"updates",
+								"force-update"
+							],
+							"query": [
+								{
+									"key": "platform",
+									"value": "{{platform}}"
+								},
+								{
+									"key": "version",
+									"value": "{{app_version}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📋 Get Store Versions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/updates/store-versions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"updates",
+								"store-versions"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
