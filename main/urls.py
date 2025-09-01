@@ -45,6 +45,9 @@ urlpatterns = [
     
     # App Versioning and force updates
     path("api/updates/", include("force_update.urls")),
+    
+    # Earnings endpoints
+    path("api/earnings/", include("earnings.urls")),
 
     # Add this line for DRF browsable API login/logout
     # path('api-auth/', include('rest_framework.urls')),
