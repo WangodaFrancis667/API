@@ -49,10 +49,10 @@ class Order(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="orders"
     )
     vendor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.PROTECT, 
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
         related_name="vendor_orders",
-        limit_choices_to={'role': 'vendor'}
+        limit_choices_to={"role": "vendor"},
     )
     # group_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     subtotal = models.DecimalField(

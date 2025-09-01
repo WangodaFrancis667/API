@@ -10,7 +10,6 @@ urlpatterns = [
     path("balance/", views.vendor_balance, name="vendor_balance"),
     path("earnings/", views.vendor_earnings_list, name="vendor_earnings_list"),
     path("payouts/", views.vendor_payouts_list, name="vendor_payouts_list"),
-    
     # Admin endpoints
     path("all-vendors/", views.all_vendors_stats, name="all_vendors_stats"),
 ]
