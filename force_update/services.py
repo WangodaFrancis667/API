@@ -75,13 +75,23 @@ class StoreVersionService:
                     f"Truncated long Android version name for {package_id}: {extracted_info.get('version_name')}"
                 )
 
+            # Create minimal response data for database storage (same as API response)
+            db_response_data = {
+                "platform": "android",
+                "app_id": package_id,
+                "version_code": extracted_info.get("version_code"),
+                "version_name": version_name,
+                "build_number": None,
+                "app_name": extracted_info.get("app_name"),
+            }
+
             StoreVersionCheck.objects.create(
                 platform="android",
                 app_id=package_id,
                 version_name=version_name,
                 version_code=extracted_info.get("version_code"),
                 status="success",
-                response_data=extracted_info,  # Store full extracted data for logging
+                response_data=db_response_data,  # Store only essential data
             )
 
             return version_info, None
@@ -198,13 +208,23 @@ class StoreVersionService:
                     f"Truncated long iOS version name for {app_id}: {full_version_info['version_name']}"
                 )
 
+            # Create minimal response data for database storage (same as API response)
+            db_response_data = {
+                "platform": "ios",
+                "app_id": app_id,
+                "version_code": None,
+                "version_name": version_name,
+                "build_number": full_version_info.get("build_number"),
+                "app_name": full_version_info.get("app_name"),
+            }
+
             StoreVersionCheck.objects.create(
                 platform="ios",
                 app_id=app_id,
                 version_name=version_name,
                 build_number=full_version_info.get("build_number"),
                 status="success",
-                response_data=full_version_info,
+                response_data=db_response_data,  # Store only essential data
             )
 
             return version_info, None
