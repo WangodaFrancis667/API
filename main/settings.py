@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "orders",
     "force_update",
     'earnings',
+    'eversend_payments',
 ]
 
 MIDDLEWARE = [
