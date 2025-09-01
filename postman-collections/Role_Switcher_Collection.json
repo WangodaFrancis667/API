@@ -1,0 +1,208 @@
+{
+	"info": {
+		"_postman_id": "role-switcher-collection",
+		"name": "🔄 Role Switcher - Quick Login Collection",
+		"description": "Quick collection for switching between different user roles (Admin, Vendor, Buyer) for testing purposes.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Role Switcher Pre-request Script",
+					"console.log('🔄 Role Switcher: Preparing authentication...');"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-store role-specific tokens",
+					"if (pm.response.code === 200) {",
+					"    try {",
+					"        const response = pm.response.json();",
+					"        const requestName = pm.info.requestName;",
+					"        ",
+					"        if (response.access && response.refresh) {",
+					"            if (requestName.includes('Admin')) {",
+					"                pm.environment.set('admin_access_token', response.access);",
+					"                pm.environment.set('admin_refresh_token', response.refresh);",
+					"                pm.environment.set('access_token', response.access);",
+					"                pm.environment.set('refresh_token', response.refresh);",
+					"                pm.environment.set('current_username', pm.environment.get('admin_username'));",
+					"                pm.environment.set('current_password', pm.environment.get('admin_password'));",
+					"                console.log('✅ Switched to Admin role');",
+					"            } else if (requestName.includes('Vendor')) {",
+					"                pm.environment.set('vendor_access_token', response.access);",
+					"                pm.environment.set('vendor_refresh_token', response.refresh);",
+					"                pm.environment.set('access_token', response.access);",
+					"                pm.environment.set('refresh_token', response.refresh);",
+					"                pm.environment.set('current_username', pm.environment.get('vendor_username'));",
+					"                pm.environment.set('current_password', pm.environment.get('vendor_password'));",
+					"                console.log('✅ Switched to Vendor role');",
+					"            } else if (requestName.includes('Buyer')) {",
+					"                pm.environment.set('buyer_access_token', response.access);",
+					"                pm.environment.set('buyer_refresh_token', response.refresh);",
+					"                pm.environment.set('access_token', response.access);",
+					"                pm.environment.set('refresh_token', response.refresh);",
+					"                pm.environment.set('current_username', pm.environment.get('buyer_username'));",
+					"                pm.environment.set('current_password', pm.environment.get('buyer_password'));",
+					"                console.log('✅ Switched to Buyer role');",
+					"            }",
+					"            ",
+					"            if (response.user) {",
+					"                pm.environment.set('user_id', response.user.id);",
+					"                pm.environment.set('user_role', response.user.role);",
+					"            }",
+					"        }",
+					"    } catch (e) {",
+					"        console.log('❌ Error parsing response:', e);",
+					"    }",
+					"}"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "👑 Login as Admin",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"{{admin_username}}\",\n    \"password\": \"{{admin_password}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/auth/login/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login",
+						""
+					]
+				},
+				"description": "Login as Admin user and switch to Admin role context"
+			}
+		},
+		{
+			"name": "🏪 Login as Vendor",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"{{vendor_username}}\",\n    \"password\": \"{{vendor_password}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/auth/login/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login",
+						""
+					]
+				},
+				"description": "Login as Vendor user and switch to Vendor role context"
+			}
+		},
+		{
+			"name": "🛒 Login as Buyer",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"{{buyer_username}}\",\n    \"password\": \"{{buyer_password}}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/auth/login/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login",
+						""
+					]
+				},
+				"description": "Login as Buyer user and switch to Buyer role context"
+			}
+		},
+		{
+			"name": "📊 Current Status & Role",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/auth/status/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"status",
+						""
+					]
+				},
+				"description": "Check current authentication status and role"
+			}
+		},
+		{
+			"name": "🚪 Logout Current User",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/auth/logout/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"logout",
+						""
+					]
+				},
+				"description": "Logout current user and clear session"
+			}
+		}
+	]
+}
