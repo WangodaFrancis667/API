@@ -19,7 +19,7 @@ from datetime import timedelta
 from pathlib import Path
 
 # load environment variables from the .env file
-load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
+load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, ".env"))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,124 +29,131 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes', 'on')
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes", "on")
 
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',') if os.environ.get('ALLOWED_HOSTS') else ['localhost', '127.0.0.1', '0.0.0.0', 'afrobuyug.com', 'api.afrobuyug.com']
-RAILWAY_PUBLIC_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN')
-if RAILWAY_PUBLIC_DOMAIN:
-    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+ALLOWED_HOSTS = (
+    os.environ.get("ALLOWED_HOSTS").split(",")
+    if os.environ.get("ALLOWED_HOSTS")
+    else ["localhost", "127.0.0.1", "0.0.0.0", "afrobuyug.com", "api.afrobuyug.com"]
+)
+# RAILWAY_PUBLIC_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+# if RAILWAY_PUBLIC_DOMAIN:
+#     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
 
     # Third party apps
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'corsheaders',
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "corsheaders",
 
     # local apps
-    'accounts',
-    'APIHealth',
-    'home_page',
-    'productManagement',
-    'app_settings',
-    'notifications',
-    'orders',
+    "accounts",
+    "APIHealth",
+    "home_page",
+    "productManagement",
+    "app_settings",
+    "notifications",
+    "orders",
+    "force_update",
+    'earnings',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'accounts.middleware.CSRFExemptAPIMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "accounts.middleware.CSRFExemptAPIMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'main.urls'
+ROOT_URLCONF = "main.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'main.wsgi.application'
+WSGI_APPLICATION = "main.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Frontend URL for password reset links
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-SITE_NAME = os.environ.get('SITE_NAME', 'AfroBuy Uganda')
-APP_NAME = 'AfroBuy'
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+SITE_NAME = os.environ.get("SITE_NAME", "AfroBuy Uganda")
+APP_NAME = "AfroBuy"
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-    }
-else:
-    DATABASES = {
-            'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get("DB_NAME"),
-            'USER': os.environ.get("DB_USER"),
-            'PASSWORD': os.environ.get("DB_PASS"),
-            'HOST': os.environ.get("DB_HOST"),
-            'PORT': os.environ.get("DB_PORT"),
-        }
-    }
+# DATABASE_URL = os.getenv("DATABASE_URL")
+# if DATABASE_URL:
+#     DATABASES = {
+#         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+#     }
+# else:
+#     DATABASES = {
+#             'default': {
+#             'ENGINE': 'django.db.backends.postgresql',
+#             'NAME': os.environ.get("DB_NAME"),
+#             'USER': os.environ.get("DB_USER"),
+#             'PASSWORD': os.environ.get("DB_PASS"),
+#             'HOST': os.environ.get("DB_HOST"),
+#             'PORT': os.environ.get("DB_PORT"),
+#         }
+#     }
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.environ.get("DB_NAME"),
-        'USER': os.environ.get("DB_USER"),
-        'PASSWORD': os.environ.get("DB_PASS"),
-        'HOST': os.environ.get("DB_HOST"),
-        'PORT': os.environ.get("DB_PORT"),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": os.environ.get("DB_NAME"),
+        "USER": os.environ.get("DB_USER"),
+        "PASSWORD": os.environ.get("DB_PASS"),
+        "HOST": os.environ.get("DB_HOST"),
+        "PORT": os.environ.get("DB_PORT"),
     }
 }
 
 # Email settings
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True' # True for 587
-EMAIL_USE_SSL = False        # True for 465
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
-SUPPORT_EMAIL = 'info@afrobuyug.com'
-VERIFICATION_BCC = []        # optional list of emails to BCC
-SUPPORT_WHATSAPP = '+256709328790'
-WHATSAPP_URL = f'https://wa.me/{SUPPORT_WHATSAPP}'
-
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"  # True for 587
+EMAIL_USE_SSL = False  # True for 465
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@yourdomain.com")
+SUPPORT_EMAIL = "info@afrobuyug.com"
+VERIFICATION_BCC = []  # optional list of emails to BCC
+SUPPORT_WHATSAPP = "+256709328790"
+WHATSAPP_URL = f"https://wa.me/{SUPPORT_WHATSAPP}"
 
 
 # Password validation
@@ -154,16 +161,16 @@ WHATSAPP_URL = f'https://wa.me/{SUPPORT_WHATSAPP}'
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -171,9 +178,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -191,10 +198,13 @@ USE_S3 = os.getenv("USE_S3", "false").lower() == "true"
 if USE_S3:
     try:
         import storages  # Check if storages is available
+
         INSTALLED_APPS += ["storages"]
         AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
         AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
-        AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com")
+        AWS_S3_CUSTOM_DOMAIN = os.getenv(
+            "AWS_S3_CUSTOM_DOMAIN", f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+        )
 
         STORAGES = {
             "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
@@ -223,54 +233,51 @@ MEDIA_URL = "https://api.afrobuyug.com/"
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-
-AUTH_USER_MODEL='accounts.User'
+AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 25,
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 25,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-        'login': '5/minute',
-        'register': '3/minute',
-    }
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+        "login": "5/minute",
+        "register": "3/minute",
+    },
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
 }
 
 # CACHING (use Redis in production)
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get('REDIS_URL', "redis://127.0.0.1:6379/1"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient"
-            },
+        "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "KEY_PREFIX": "afrobuy",
         "TIMEOUT": 300,  # 5 minutes default timeout
     }
@@ -286,7 +293,9 @@ CACHE_TTL = 60 * 15  # 15 minutes
 # Celery (Redis broker & backend)
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/2"
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/3"
-CELERY_TASK_ALWAYS_EAGER = False  # make True for local debugging if you want sync behavior
+CELERY_TASK_ALWAYS_EAGER = (
+    False  # make True for local debugging if you want sync behavior
+)
 CELERY_TASK_TIME_LIMIT = 60
 CELERY_TASK_SOFT_TIME_LIMIT = 45
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -310,17 +319,23 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    # "http://0.0.0.0:8000",
-]
+CORS_ALLOWED_ORIGINS = (
+    os.environ.get(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if os.environ.get("CORS_ALLOWED_ORIGINS")
+    else [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        # "http://0.0.0.0:8000",
+    ]
+)
 
 CELERY_BEAT_SCHEDULE = {
     "refresh_categories_cache": {
@@ -334,41 +349,62 @@ CORS_ALLOW_CREDENTIALS = True
 # Session Security
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = True
 
 # Logging configuration
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': 'security.log',
-            'formatter': 'verbose',
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": "security.log",
+            "formatter": "verbose",
         },
     },
-    'loggers': {
-        'accounts.security': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': True,
+    "loggers": {
+        "accounts.security": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": True,
         },
-        'productManagement': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': True,
+        "productManagement": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
         },
     },
 }
+
+# Force Update Settings
+PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.afrobuyug.app"
+# APP_STORE_URL = os.environ.get("APP_STORE_URL", "")
+APP_STORE_URL = "https://apps.apple.com/app/afrobuy/id6748551427 "
+ANDROID_PACKAGE_ID = "com.afrobuyug.app"
+IOS_APP_ID = "id6748551427"  # os.environ.get("IOS_APP_ID", "")
+IOS_BUNDLE_ID = "com.afrobuyug.app"
+
+# Force Update Configuration Defaults
+MIN_REQUIRED_VERSION_CODE = 1
+LATEST_VERSION_NAME = "1.0.7"
+LATEST_VERSION_CODE = 1
+FORCE_UPDATE_ENABLED = False
+SOFT_UPDATE_VERSION_CODE = None
+FORCE_UPDATE_CACHE_TIMEOUT = 300  # 5 minutes
+
+# iOS specific defaults
+IOS_MIN_REQUIRED_BUILD = 1
+IOS_LATEST_VERSION_NAME = "1.0.7"
+IOS_LATEST_BUILD_NUMBER = 1

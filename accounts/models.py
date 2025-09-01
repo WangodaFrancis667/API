@@ -259,6 +259,7 @@ class User(AbstractUser):
             models.Index(name='idx_user_status', fields=['status']),  # Fast status filtering
             models.Index(name='idx_user_wallet', fields=['wallet']),  # Fast wallet queries
             models.Index(name='idx_user_role_status', fields=['role', 'status']),  # Composite index for common filters
+            models.Index(name='idx_user_username_role', fields=['username', 'role']),  # Fast vendor username lookups
             models.Index(name='idx_user_verification', fields=['email_verified', 'phone_verified']),  # Verification status queries
         ]
 

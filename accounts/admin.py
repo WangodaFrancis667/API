@@ -8,7 +8,7 @@ from .models import User, AdminProfile, VendorProfile, BuyerProfile, UserActivit
 class UserAdmin(BaseUserAdmin):
     """Enhanced User admin with role-based management and financial tracking."""
     
-    list_display = ('full_name', 'username', 'email','phone', 'role', 'status', 'wallet_display', 'referral_points', 
+    list_display = ('id', 'full_name', 'username', 'email','phone', 'role', 'status', 'wallet_display', 'referral_points', 
                    'verification_status', 'is_active', 'date_joined')
     list_filter = ('role', 'status', 'email_verified', 'phone_verified', 'is_active', 'is_staff')
     search_fields = ('full_name', 'username', 'email', 'phone', 'first_name', 'last_name', 'business_name')

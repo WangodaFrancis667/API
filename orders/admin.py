@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, OrderItem, GroupOrder, OrderReturn
+from .models import Order, OrderItem, OrderReturn # GroupOrder, 
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
@@ -8,5 +8,5 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ("status",)
 
 admin.site.register(OrderItem)
-admin.site.register(GroupOrder)
+# admin.site.register(GroupOrder)
 admin.site.register(OrderReturn)

@@ -1,0 +1,432 @@
+import requests
+import json
+import logging
+from typing import Dict, Optional, Tuple
+from django.conf import settings
+from django.utils import timezone
+from .models import StoreVersionCheck
+
+logger = logging.getLogger(__name__)
+
+
+class StoreVersionService:
+    """
+    Service class to fetch version information from Google Play Store and Apple App Store.
+    """
+
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+        )
+
+    def get_google_play_version(
+        self, package_id: str
+    ) -> Tuple[Optional[Dict], Optional[str]]:
+        """
+        Fetch version information from Google Play Store.
+
+        Args:
+            package_id: Android package ID (e.g., 'com.afrobuyug.app')
+
+        Returns:
+            Tuple of (version_info_dict, error_message)
+        """
+        try:
+            url = f"https://play.google.com/store/apps/details?id={package_id}&hl=en&gl=us"
+
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
+
+            # Parse the HTML to extract version information
+            html_content = response.text
+
+            # Look for version information in the HTML
+            # Google Play uses different patterns, we'll try multiple approaches
+            # Extract version information from HTML
+            extracted_info = self._extract_play_store_version(html_content, package_id)
+
+            # Create minimal version info for API response
+            version_info = {
+                "platform": "android",
+                "app_id": package_id,
+                "version_code": extracted_info.get("version_code"),
+                "version_name": extracted_info.get("version_name"),
+                "build_number": None,  # Google Play doesn't provide build numbers
+                "app_name": extracted_info.get("app_name"),
+            }
+
+            # Truncate version_name if it's too long for the database
+            version_name = version_info.get("version_name")
+            if version_name and len(version_name) > 200:
+                version_name = version_name[:200]
+                logger.warning(
+                    f"Truncated long version name for {package_id}: {version_info.get('version_name')}"
+                )
+
+            # Log the successful check
+            # Truncate version_name if it's too long for the database
+            version_name = extracted_info.get("version_name")
+            if version_name and len(version_name) > 200:
+                version_name = version_name[:200]
+                logger.warning(
+                    f"Truncated long Android version name for {package_id}: {extracted_info.get('version_name')}"
+                )
+
+            # Create minimal response data for database storage (same as API response)
+            db_response_data = {
+                "platform": "android",
+                "app_id": package_id,
+                "version_code": extracted_info.get("version_code"),
+                "version_name": version_name,
+                "build_number": None,
+                "app_name": extracted_info.get("app_name"),
+            }
+
+            StoreVersionCheck.objects.create(
+                platform="android",
+                app_id=package_id,
+                version_name=version_name,
+                version_code=extracted_info.get("version_code"),
+                status="success",
+                response_data=db_response_data,  # Store only essential data
+            )
+
+            return version_info, None
+
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch Google Play Store data: {str(e)}"
+            logger.error(error_msg)
+
+            StoreVersionCheck.objects.create(
+                platform="android",
+                app_id=package_id,
+                status="failed",
+                error_message=error_msg,
+            )
+
+            return None, error_msg
+        except Exception as e:
+            error_msg = f"Unexpected error fetching Google Play Store data: {str(e)}"
+            logger.error(error_msg)
+
+            StoreVersionCheck.objects.create(
+                platform="android",
+                app_id=package_id,
+                status="failed",
+                error_message=error_msg,
+            )
+
+            return None, error_msg
+
+    def get_app_store_version(
+        self, app_id: str, bundle_id: str = None
+    ) -> Tuple[Optional[Dict], Optional[str]]:
+        """
+        Fetch version information from Apple App Store using iTunes API.
+
+        Args:
+            app_id: Apple App Store ID (can be with or without 'id' prefix)
+            bundle_id: iOS bundle ID (optional, used for validation)
+
+        Returns:
+            Tuple of (version_info_dict, error_message)
+        """
+        try:
+            # Clean the app_id - remove 'id' prefix if present
+            clean_app_id = (
+                app_id.replace("id", "") if app_id.startswith("id") else app_id
+            )
+
+            # Use iTunes Search API
+            url = f"https://itunes.apple.com/lookup?id={clean_app_id}"
+
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+
+            if data["resultCount"] == 0:
+                error_msg = f"App not found in App Store with ID: {app_id}"
+
+                StoreVersionCheck.objects.create(
+                    platform="ios",
+                    app_id=app_id,
+                    status="not_found",
+                    error_message=error_msg,
+                )
+
+                return None, error_msg
+
+            app_info = data["results"][0]
+
+            # Validate bundle ID if provided
+            if bundle_id and app_info.get("bundleId") != bundle_id:
+                error_msg = f"Bundle ID mismatch. Expected: {bundle_id}, Got: {app_info.get('bundleId')}"
+                logger.warning(error_msg)
+
+            # Store full data for database logging
+            full_version_info = {
+                "version_name": app_info.get("version"),
+                "build_number": None,  # Will try to extract below
+                "bundle_id": app_info.get("bundleId"),
+                "app_name": app_info.get("trackName"),
+                "release_date": app_info.get("currentVersionReleaseDate"),
+                "release_notes": app_info.get("releaseNotes", ""),
+                "minimum_os_version": app_info.get("minimumOsVersion"),
+                "app_store_url": app_info.get("trackViewUrl"),
+                "icon_url": app_info.get("artworkUrl512"),
+                "file_size": app_info.get("fileSizeBytes"),
+                "content_rating": app_info.get("contentAdvisoryRating"),
+                "raw_data": app_info,
+            }
+
+            # Try to extract build number from release notes if available
+            build_number = self._try_extract_build_number(
+                app_info.get("releaseNotes", ""), app_info.get("version", "")
+            )
+            if build_number:
+                full_version_info["build_number"] = build_number
+
+            # Create minimal version info for API response
+            version_info = {
+                "platform": "ios",
+                "app_id": app_id,
+                "version_code": None,  # iOS doesn't use version codes
+                "version_name": app_info.get("version"),
+                "build_number": full_version_info.get("build_number"),
+                "app_name": app_info.get("trackName"),
+            }
+
+            # Truncate version_name if it's too long for the database
+            version_name = full_version_info["version_name"]
+            if version_name and len(version_name) > 200:
+                version_name = version_name[:200]
+                logger.warning(
+                    f"Truncated long iOS version name for {app_id}: {full_version_info['version_name']}"
+                )
+
+            # Create minimal response data for database storage (same as API response)
+            db_response_data = {
+                "platform": "ios",
+                "app_id": app_id,
+                "version_code": None,
+                "version_name": version_name,
+                "build_number": full_version_info.get("build_number"),
+                "app_name": full_version_info.get("app_name"),
+            }
+
+            StoreVersionCheck.objects.create(
+                platform="ios",
+                app_id=app_id,
+                version_name=version_name,
+                build_number=full_version_info.get("build_number"),
+                status="success",
+                response_data=db_response_data,  # Store only essential data
+            )
+
+            return version_info, None
+
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch App Store data: {str(e)}"
+            logger.error(error_msg)
+
+            StoreVersionCheck.objects.create(
+                platform="ios", app_id=app_id, status="failed", error_message=error_msg
+            )
+
+            return None, error_msg
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse App Store response: {str(e)}"
+            logger.error(error_msg)
+
+            StoreVersionCheck.objects.create(
+                platform="ios", app_id=app_id, status="failed", error_message=error_msg
+            )
+
+            return None, error_msg
+        except Exception as e:
+            error_msg = f"Unexpected error fetching App Store data: {str(e)}"
+            logger.error(error_msg)
+
+            StoreVersionCheck.objects.create(
+                platform="ios", app_id=app_id, status="failed", error_message=error_msg
+            )
+
+            return None, error_msg
+
+    def _extract_play_store_version(self, html_content: str, package_id: str) -> Dict:
+        """
+        Extract version information from Google Play Store HTML.
+        This is a fallback method since Google doesn't provide a public API.
+        """
+        import re
+
+        version_info = {
+            "package_id": package_id,
+            "version_name": None,
+            "version_code": None,
+            "last_updated": None,
+            "app_name": None,
+        }
+
+        try:
+            # Try to extract version name using various patterns
+            version_patterns = [
+                r'"versionName":"([^"]+)"',
+                r'"softwareVersion":"([^"]+)"',
+                r"Current Version[^>]*>([^<]{1,50})<",
+                r"Version[^>]*>([^<]{1,50})<",
+                r'<div[^>]*class="[^"]*version[^"]*"[^>]*>([^<]+)</div>',
+                r'<span[^>]*class="[^"]*version[^"]*"[^>]*>([^<]+)</span>',
+                r">\s*(\d+\.\d+\.?\d*)\s*<",
+            ]
+
+            for pattern in version_patterns:
+                match = re.search(pattern, html_content, re.IGNORECASE)
+                if match:
+                    version_value = match.group(1).strip()
+                    # Validate that it looks like a version number and isn't HTML
+                    if (
+                        len(version_value) < 100
+                        and not "<" in version_value
+                        and not ">" in version_value
+                        and (
+                            re.match(r"^\d+(\.\d+)*$", version_value)
+                            or any(char.isdigit() for char in version_value)
+                        )
+                    ):
+                        version_info["version_name"] = version_value
+                        break
+
+            # Try to extract version code using various patterns
+            version_code_patterns = [
+                r'"versionCode":"?(\d+)"?',
+                r'"versionCode":(\d+)',
+                r'versionCode["\s:=]+(\d+)',
+                r'android:versionCode="(\d+)"',
+            ]
+
+            for pattern in version_code_patterns:
+                match = re.search(pattern, html_content, re.IGNORECASE)
+                if match:
+                    try:
+                        version_info["version_code"] = int(match.group(1))
+                        logger.info(
+                            f"Extracted version_code: {version_info['version_code']} for {package_id}"
+                        )
+                        break
+                    except ValueError:
+                        continue
+
+            # Try to extract app name
+            app_name_patterns = [
+                r'"name":"([^"]+)"',
+                r'"applicationName":"([^"]+)"',
+                r"<title>([^<]{1,100}) - Google Play</title>",
+                r"<h1[^>]*>([^<]{1,100})</h1>",
+                r'data-track-click="app-name">([^<]{1,100})</span>',
+                r'<span[^>]*class="[^"]*title[^"]*"[^>]*>([^<]{1,100})</span>',
+            ]
+
+            for pattern in app_name_patterns:
+                match = re.search(pattern, html_content, re.IGNORECASE)
+                if match:
+                    app_name_value = match.group(1).strip()
+                    # Validate that it's not HTML or excessively long
+                    if (
+                        len(app_name_value) < 200
+                        and not "<script" in app_name_value.lower()
+                        and not "javascript" in app_name_value.lower()
+                        and not "google play" in app_name_value.lower()
+                    ):
+                        version_info["app_name"] = app_name_value
+                        break
+
+            # Try to extract last updated date
+            updated_patterns = [r"Updated[^>]*>([^<]+)<", r"Last updated[^>]*>([^<]+)<"]
+
+            for pattern in updated_patterns:
+                match = re.search(pattern, html_content, re.IGNORECASE)
+                if match:
+                    version_info["last_updated"] = match.group(1).strip()
+                    break
+
+        except Exception as e:
+            logger.warning(f"Failed to parse Google Play Store HTML: {str(e)}")
+
+        return version_info
+
+    def _try_extract_build_number(
+        self, release_notes: str, version: str
+    ) -> Optional[str]:
+        """
+        Try to extract build number from iOS release notes or version info.
+        Many developers include build numbers in their release notes.
+        """
+        if not release_notes:
+            return None
+
+        import re
+
+        # Common patterns for build numbers in release notes
+        build_patterns = [
+            r"[Bb]uild\s*:?\s*(\d+)",
+            r"[Bb]uild\s*[Nn]umber\s*:?\s*(\d+)",
+            r"[Bb]uild\s*[Vv]ersion\s*:?\s*(\d+)",
+            r"\([Bb]uild\s*(\d+)\)",
+            r"[Vv]ersion\s*" + re.escape(version) + r"\s*\((\d+)\)",
+            r"[Vv]" + re.escape(version) + r"\s*\((\d+)\)",
+        ]
+
+        for pattern in build_patterns:
+            match = re.search(pattern, release_notes, re.IGNORECASE)
+            if match:
+                try:
+                    build_num = int(match.group(1))
+                    # Reasonable build number validation
+                    if 1 <= build_num <= 999999:
+                        logger.info(
+                            f"Extracted build_number: {build_num} from iOS release notes"
+                        )
+                        return str(build_num)
+                except ValueError:
+                    continue
+
+        return None
+
+    def get_alternative_play_store_info(
+        self, package_id: str
+    ) -> Tuple[Optional[Dict], Optional[str]]:
+        """
+        Alternative method to get Google Play Store info using different endpoints.
+        This uses unofficial APIs that might be more reliable.
+        """
+        try:
+            # Try using the unofficial Play Store API
+            url = f"https://play.google.com/store/apps/details?id={package_id}&hl=en"
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (compatible; GoogleBot/2.1; +http://www.google.com/bot.html)",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive",
+            }
+
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            return self._extract_play_store_version(response.text, package_id), None
+
+        except Exception as e:
+            error_msg = f"Alternative Google Play fetch failed: {str(e)}"
+            logger.error(error_msg)
+            return None, error_msg
+
+
+def get_store_service() -> StoreVersionService:
+    """Factory function to get the store version service."""
+    return StoreVersionService()
