@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
+
     # Third party apps
     "rest_framework",
     "rest_framework_simplejwt",
@@ -386,3 +386,6 @@ LOGGING = {
         },
     },
 }
+
+# force update settings
+PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.afrobuyug.app"

@@ -44,7 +44,7 @@ urlpatterns = [
     path("api/orders/", include("orders.urls")),
     
     # App Versioning and force updates
-    path("api/updates/", include("appVersions.urls")),
+    path("api/updates/", include("force_update.urls")),
 
     # Add this line for DRF browsable API login/logout
     # path('api-auth/', include('rest_framework.urls')),
