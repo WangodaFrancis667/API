@@ -54,12 +54,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Third party apps
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-
     # local apps
     "accounts",
     "APIHealth",
@@ -387,5 +385,23 @@ LOGGING = {
     },
 }
 
-# force update settings
+# Force Update Settings
 PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.afrobuyug.app"
+# APP_STORE_URL = os.environ.get("APP_STORE_URL", "")
+APP_STORE_URL = "https://apps.apple.com/app/afrobuy/id6748551427 "
+ANDROID_PACKAGE_ID = "com.afrobuyug.app"
+IOS_APP_ID = "id6748551427"  # os.environ.get("IOS_APP_ID", "")
+IOS_BUNDLE_ID = "com.afrobuyug.app"
+
+# Force Update Configuration Defaults
+MIN_REQUIRED_VERSION_CODE = 1
+LATEST_VERSION_NAME = "1.0.7"
+LATEST_VERSION_CODE = 1
+FORCE_UPDATE_ENABLED = False
+SOFT_UPDATE_VERSION_CODE = None
+FORCE_UPDATE_CACHE_TIMEOUT = 300  # 5 minutes
+
+# iOS specific defaults
+IOS_MIN_REQUIRED_BUILD = 1
+IOS_LATEST_VERSION_NAME = "1.0.7"
+IOS_LATEST_BUILD_NUMBER = 1
