@@ -7,4 +7,7 @@ urlpatterns = [
 
     #collections
     path("collections/", include("eversend_payments.collections.urls")),
+
+    #payouts
+    path("payout/", include("eversend_payments.payouts.urls")),
 ]
