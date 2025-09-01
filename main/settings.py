@@ -161,6 +161,7 @@ EVERSEND_CLIENT_SECRET = os.environ.get("EVERSEND_CLIENT_SECRET", "")
 EVERSEND_WEBHOOK_SECRET = os.environ.get(
     "EVERSEND_WEBHOOK_SECRET", ""
 )  # optional HMAC if you add signature checks
+EVERSEND_API_KEY = os.environ.get("EVERSEND_API_KEY", "")  # fallback API key if needed
 
 
 # Password validation
