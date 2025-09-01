@@ -3,48 +3,51 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+
 class Transaction(models.Model):
     TRANSACTION_TYPES = [
-        ('deposit', 'Deposit'),
-        ('withdraw', 'Withdraw'),
-        ('transfer', 'Transfer'),
+        ("deposit", "Deposit"),
+        ("withdraw", "Withdraw"),
+        ("transfer", "Transfer"),
     ]
-    
+
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('successful', 'Successful'),
-        ('failed', 'Failed'),
-        ('cancelled', 'Cancelled'),
-        ('reversed', 'Reversed'),
+        ("pending", "Pending"),
+        ("successful", "Successful"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+        ("reversed", "Reversed"),
     ]
 
     # Core fields
     uuid = models.CharField(max_length=64, db_index=True)  # user identifier
     transaction_ref = models.CharField(max_length=128, unique=True)
     transaction_id = models.CharField(max_length=128, null=True, blank=True)
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, default='deposit')
-    
+    transaction_type = models.CharField(
+        max_length=20, choices=TRANSACTION_TYPES, default="deposit"
+    )
+
     # Financial fields
     currency = models.CharField(max_length=8)
     amount = models.DecimalField(max_digits=18, decimal_places=2)
     service_fee = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     charges = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    
+
     # Transaction details
     account_number = models.CharField(max_length=50, null=True, blank=True)
     country = models.CharField(max_length=10, null=True, blank=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
-    
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['uuid', 'status']),
-            models.Index(fields=['transaction_ref']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=["uuid", "status"]),
+            models.Index(fields=["transaction_ref"]),
+            models.Index(fields=["created_at"]),
         ]
 
     def __str__(self):
@@ -61,7 +64,7 @@ class Wallet(models.Model):
     class Meta:
         unique_together = ("uuid", "currency")
         indexes = [
-            models.Index(fields=['uuid', 'currency']),
+            models.Index(fields=["uuid", "currency"]),
         ]
 
     def __str__(self):
@@ -80,32 +83,34 @@ class Commission(models.Model):
 
 class Payment(models.Model):
     PAYMENT_STATUS = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-        ('reversed', 'Reversed'),
-        ('cancelled', 'Cancelled'),
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("reversed", "Reversed"),
+        ("cancelled", "Cancelled"),
     ]
 
     # Core identifiers
     user_uuid = models.CharField(max_length=64, db_index=True)
     order_id = models.CharField(max_length=128, null=True, blank=True)
     transaction_ref = models.CharField(max_length=128, db_index=True)
-    
+
     # Payment details
     amount = models.DecimalField(max_digits=18, decimal_places=2)
-    payment_method = models.CharField(max_length=64)   # e.g., "eversend"
-    status = models.CharField(max_length=32, choices=PAYMENT_STATUS, default="completed")
-    
+    payment_method = models.CharField(max_length=64)  # e.g., "eversend"
+    status = models.CharField(
+        max_length=32, choices=PAYMENT_STATUS, default="completed"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['user_uuid']),
-            models.Index(fields=['transaction_ref']),
+            models.Index(fields=["user_uuid"]),
+            models.Index(fields=["transaction_ref"]),
         ]
 
     def __str__(self):
@@ -114,25 +119,25 @@ class Payment(models.Model):
 
 class Earning(models.Model):
     EARNING_STATUS = [
-        ('pending', 'Pending'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
     ]
 
     uuid = models.CharField(max_length=64, db_index=True)
     currency = models.CharField(max_length=8)
     transaction_ref = models.CharField(max_length=128, db_index=True)
-    service_name = models.CharField(max_length=100, default='exchange')
+    service_name = models.CharField(max_length=100, default="exchange")
     amount = models.DecimalField(max_digits=18, decimal_places=2)
-    status = models.CharField(max_length=20, choices=EARNING_STATUS, default='pending')
+    status = models.CharField(max_length=20, choices=EARNING_STATUS, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['uuid']),
-            models.Index(fields=['transaction_ref']),
+            models.Index(fields=["uuid"]),
+            models.Index(fields=["transaction_ref"]),
         ]
 
     def __str__(self):
@@ -147,9 +152,9 @@ class AuditLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=['uuid', 'created_at']),
+            models.Index(fields=["uuid", "created_at"]),
         ]
 
     def __str__(self):

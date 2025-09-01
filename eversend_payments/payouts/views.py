@@ -15,23 +15,31 @@ from eversend_payments.utils import log_transaction, get_client_ip
 
 
 class PayoutThrottle(UserRateThrottle):
-    rate = '50/hour'
+    rate = "50/hour"
 
 
 class PayoutView(APIView):
     """Enhanced payout view with comprehensive validation and error handling"""
+
     throttle_classes = [PayoutThrottle]
 
     def post(self, request):
         client_ip = get_client_ip(request)
         transaction_ref = f"txn_{uuid.uuid4().hex[:12]}"
-        
+
         try:
             serializer = PayoutRequestSerializer(data=request.data)
             if not serializer.is_valid():
-                log_transaction(f"Invalid payout request from {client_ip}: {serializer.errors}", "warning")
+                log_transaction(
+                    f"Invalid payout request from {client_ip}: {serializer.errors}",
+                    "warning",
+                )
                 return Response(
-                    {"status": "error", "message": "Invalid input", "errors": serializer.errors},
+                    {
+                        "status": "error",
+                        "message": "Invalid input",
+                        "errors": serializer.errors,
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -58,15 +66,21 @@ class PayoutView(APIView):
             )
 
             # Extract transaction details from API response
-            if "data" not in response_data or "transaction" not in response_data["data"]:
-                log_transaction(f"Invalid API response structure for payout {transaction_ref}", "error")
+            if (
+                "data" not in response_data
+                or "transaction" not in response_data["data"]
+            ):
+                log_transaction(
+                    f"Invalid API response structure for payout {transaction_ref}",
+                    "error",
+                )
                 return Response(
                     {"status": "error", "message": "Invalid API response"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
             trx = response_data["data"]["transaction"]
-            
+
             try:
                 api_amount = Decimal(str(trx["amount"]))
                 service_fee = Decimal(str(data["serviceFee"]))
@@ -81,8 +95,7 @@ class PayoutView(APIView):
                 # Check wallet balance
                 try:
                     wallet = Wallet.objects.select_for_update().get(
-                        uuid=data["uuid"], 
-                        currency=trx["currency"]
+                        uuid=data["uuid"], currency=trx["currency"]
                     )
                 except Wallet.DoesNotExist:
                     return Response(
@@ -91,7 +104,10 @@ class PayoutView(APIView):
                     )
 
                 if wallet.amount < total_amount:
-                    log_transaction(f"Insufficient balance for payout {transaction_ref}: {wallet.amount} < {total_amount}", "warning")
+                    log_transaction(
+                        f"Insufficient balance for payout {transaction_ref}: {wallet.amount} < {total_amount}",
+                        "warning",
+                    )
                     return Response(
                         {"status": "error", "message": "Insufficient balance"},
                         status=status.HTTP_400_BAD_REQUEST,
@@ -135,8 +151,7 @@ class PayoutView(APIView):
 
                 # Update commission
                 commission, _ = Commission.objects.select_for_update().get_or_create(
-                    currency=trx["currency"],
-                    defaults={"amount": Decimal("0")}
+                    currency=trx["currency"], defaults={"amount": Decimal("0")}
                 )
                 commission.amount = models.F("amount") + service_fee
                 commission.save(update_fields=["amount", "updated_at"])
@@ -146,39 +161,63 @@ class PayoutView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         except ValueError as e:
-            log_transaction(f"Validation error in payout from {client_ip}: {e}", "error")
+            log_transaction(
+                f"Validation error in payout from {client_ip}: {e}", "error"
+            )
             return Response(
-                {"status": "error", "message": str(e), "transactionRef": transaction_ref},
+                {
+                    "status": "error",
+                    "message": str(e),
+                    "transactionRef": transaction_ref,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            log_transaction(f"Unexpected error in payout from {client_ip}: {e}", "error")
+            log_transaction(
+                f"Unexpected error in payout from {client_ip}: {e}", "error"
+            )
             # Update transaction status to failed if it was created
-            Transaction.objects.filter(transaction_ref=transaction_ref).update(status="failed")
+            Transaction.objects.filter(transaction_ref=transaction_ref).update(
+                status="failed"
+            )
             return Response(
-                {"status": "error", "message": "Payout failed", "transactionRef": transaction_ref},
+                {
+                    "status": "error",
+                    "message": "Payout failed",
+                    "transactionRef": transaction_ref,
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
 class PayoutQuotationView(APIView):
     """Enhanced payout quotation view with validation"""
+
     throttle_classes = [PayoutThrottle]
 
     def post(self, request):
         client_ip = get_client_ip(request)
-        
+
         try:
             serializer = PayoutQuotationSerializer(data=request.data)
             if not serializer.is_valid():
-                log_transaction(f"Invalid quotation request from {client_ip}: {serializer.errors}", "warning")
+                log_transaction(
+                    f"Invalid quotation request from {client_ip}: {serializer.errors}",
+                    "warning",
+                )
                 return Response(
-                    {"status": "error", "message": "Invalid input", "errors": serializer.errors},
+                    {
+                        "status": "error",
+                        "message": "Invalid input",
+                        "errors": serializer.errors,
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             data = serializer.validated_data
-            log_transaction(f"Payout quotation request from {client_ip}: {data['sourceWallet']} -> {data['destinationCurrency']}")
+            log_transaction(
+                f"Payout quotation request from {client_ip}: {data['sourceWallet']} -> {data['destinationCurrency']}"
+            )
 
             response_data = eversend_payout_quotation(
                 source_wallet=data["sourceWallet"],
@@ -193,13 +232,17 @@ class PayoutQuotationView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         except ValueError as e:
-            log_transaction(f"Validation error in quotation from {client_ip}: {e}", "error")
+            log_transaction(
+                f"Validation error in quotation from {client_ip}: {e}", "error"
+            )
             return Response(
                 {"status": "error", "message": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
-            log_transaction(f"Unexpected error in quotation from {client_ip}: {e}", "error")
+            log_transaction(
+                f"Unexpected error in quotation from {client_ip}: {e}", "error"
+            )
             return Response(
                 {"status": "error", "message": "Quotation request failed"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -214,22 +257,29 @@ class PayoutQuotationView(APIView):
             final_total = data["amount"] + total_fees
 
             # Check wallet balance
-            wallet = Wallet.objects.filter(uuid=data["uuid"], currency=data["sourceWallet"]).first()
+            wallet = Wallet.objects.filter(
+                uuid=data["uuid"], currency=data["sourceWallet"]
+            ).first()
             if not wallet or wallet.amount < final_total:
-                return JsonResponse({
-                    "status": "error",
-                    "message": "Insufficient wallet balance",
-                    "rate": quotation["exchangeRate"],
-                    "totalAmountRequired": final_total,
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Insufficient wallet balance",
+                        "rate": quotation["exchangeRate"],
+                        "totalAmountRequired": final_total,
+                        "service_fee": service_fee,
+                        "total_fees": total_fees,
+                    },
+                    status=400,
+                )
+
+            quotation.update(
+                {
                     "service_fee": service_fee,
                     "total_fees": total_fees,
-                }, status=400)
-
-            quotation.update({
-                "service_fee": service_fee,
-                "total_fees": total_fees,
-                "totalAmountRequired": final_total,
-            })
+                    "totalAmountRequired": final_total,
+                }
+            )
             resp_data["data"]["quotation"] = quotation
 
             return JsonResponse(resp_data, status=200)

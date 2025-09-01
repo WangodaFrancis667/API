@@ -5,96 +5,82 @@ from decimal import Decimal
 
 class FeeRequestSerializer(serializers.Serializer):
     method = serializers.CharField(
-        max_length=50,
-        help_text="Payment method (e.g., 'momo', 'bank')"
+        max_length=50, help_text="Payment method (e.g., 'momo', 'bank')"
     )
     currency = serializers.CharField(
-        max_length=3,
-        help_text="3-letter currency code (e.g., 'USD', 'UGX')"
+        max_length=3, help_text="3-letter currency code (e.g., 'USD', 'UGX')"
     )
     amount = serializers.FloatField(
-        min_value=500, 
-        max_value=4000000,
-        help_text="Amount to be collected"
+        min_value=500, max_value=4000000, help_text="Amount to be collected"
     )
 
     def validate_currency(self, value):
         """Validate currency format"""
         if not value.isalpha() or len(value) != 3:
-            raise serializers.ValidationError("Currency must be a 3-letter alphabetic code")
+            raise serializers.ValidationError(
+                "Currency must be a 3-letter alphabetic code"
+            )
         return value.upper()
 
     def validate_method(self, value):
         """Validate payment method"""
-        allowed_methods = ['momo', 'bank', 'card']
+        allowed_methods = ["momo", "bank", "card"]
         if value.lower() not in allowed_methods:
-            raise serializers.ValidationError(f"Method must be one of: {allowed_methods}")
+            raise serializers.ValidationError(
+                f"Method must be one of: {allowed_methods}"
+            )
         return value.lower()
 
 
 class OTPRequestSerializer(serializers.Serializer):
     phone = serializers.CharField(
-        max_length=20,
-        help_text="Phone number in international format"
+        max_length=20, help_text="Phone number in international format"
     )
 
     def validate_phone(self, value):
         """Validate phone number format"""
         # Remove common separators
-        cleaned_phone = value.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-        
+        cleaned_phone = (
+            value.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        )
+
         # Basic validation
         if len(cleaned_phone) < 10:
             raise serializers.ValidationError("Phone number is too short")
-        
+
         if not cleaned_phone.replace("+", "").isdigit():
-            raise serializers.ValidationError("Phone number contains invalid characters")
-        
+            raise serializers.ValidationError(
+                "Phone number contains invalid characters"
+            )
+
         return cleaned_phone
 
 
 class MoMoRequestSerializer(serializers.Serializer):
     phone = serializers.CharField(
-        max_length=20,
-        help_text="Phone number for mobile money"
+        max_length=20, help_text="Phone number for mobile money"
     )
     amount = serializers.FloatField(
-        min_value=0.01,
-        help_text="Total transaction amount"
+        min_value=0.01, help_text="Total transaction amount"
     )
     country = serializers.CharField(
-        max_length=3,
-        help_text="2-letter country code (e.g., 'UG', 'KE')"
+        max_length=3, help_text="2-letter country code (e.g., 'UG', 'KE')"
     )
-    currency = serializers.CharField(
-        max_length=3,
-        help_text="3-letter currency code"
-    )
+    currency = serializers.CharField(max_length=3, help_text="3-letter currency code")
     otp = serializers.CharField(
-        max_length=10,
-        help_text="OTP code from mobile money provider"
+        max_length=10, help_text="OTP code from mobile money provider"
     )
-    customer = serializers.CharField(
-        max_length=255,
-        help_text="Customer identifier"
-    )
-    uuid = serializers.CharField(
-        max_length=50,
-        help_text="User unique identifier"
-    )
-    service_fee = serializers.FloatField(
-        min_value=0,
-        help_text="Service fee charged"
-    )
-    charges = serializers.FloatField(
-        min_value=0,
-        help_text="Additional charges"
-    )
+    customer = serializers.CharField(max_length=255, help_text="Customer identifier")
+    uuid = serializers.CharField(max_length=50, help_text="User unique identifier")
+    service_fee = serializers.FloatField(min_value=0, help_text="Service fee charged")
+    charges = serializers.FloatField(min_value=0, help_text="Additional charges")
 
     def validate_currency(self, value):
         """Validate currency format"""
         if not value.isalpha() or len(value) != 3:
-            raise serializers.ValidationError("Currency must be a 3-letter alphabetic code")
+            raise serializers.ValidationError(
+                "Currency must be a 3-letter alphabetic code"
+            )
         return value.upper()
 
     def validate_country(self, value):
@@ -120,9 +106,9 @@ class MoMoRequestSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """Cross-field validation"""
-        amount = attrs.get('amount', 0)
-        service_fee = attrs.get('service_fee', 0)
-        charges = attrs.get('charges', 0)
+        amount = attrs.get("amount", 0)
+        service_fee = attrs.get("service_fee", 0)
+        charges = attrs.get("charges", 0)
 
         if service_fee + charges > amount:
             raise serializers.ValidationError(

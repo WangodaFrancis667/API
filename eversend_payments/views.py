@@ -32,57 +32,62 @@ class EversendTokenView(APIView):
     Secure endpoint for retrieving Eversend access token.
     This endpoint should be restricted to admin users only.
     """
+
     # Add authentication for production
     # authentication_classes = [TokenAuthentication, SessionAuthentication]
     # permission_classes = [IsAdminUser]
-    
+
     # For now, keeping as unrestricted but should be secured
     authentication_classes = []
     permission_classes = []
 
     def get(self, request: HttpRequest):
         client_ip = get_client_ip(request)
-        
+
         # Log the request for security monitoring
         log_transaction(f"Token request from IP: {client_ip}")
-        
+
         try:
             token = get_eversend_token()
             if token:
                 # Don't log the actual token for security
                 log_transaction(f"Token successfully retrieved for IP: {client_ip}")
-                
+
                 # In production, you might want to return limited info
                 # or require additional authentication
                 return Response(
-                    {"status": "success", "token": token}, 
-                    status=status.HTTP_200_OK
+                    {"status": "success", "token": token}, status=status.HTTP_200_OK
                 )
             else:
-                log_transaction(f"Failed to retrieve token for IP: {client_ip}", "error")
-                return Response(
-                    {"detail": "Failed to retrieve token"}, 
-                    status=status.HTTP_502_BAD_GATEWAY
+                log_transaction(
+                    f"Failed to retrieve token for IP: {client_ip}", "error"
                 )
-                
+                return Response(
+                    {"detail": "Failed to retrieve token"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
         except Exception as e:
-            log_transaction(f"Unexpected error retrieving token for IP {client_ip}: {e}", "error")
+            log_transaction(
+                f"Unexpected error retrieving token for IP {client_ip}: {e}", "error"
+            )
             return Response(
-                {"detail": "Internal server error"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
 class EversendWebhookThrottle(AnonRateThrottle):
-    rate = '1000/hour'
+    rate = "1000/hour"
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class EversendWebhookView(APIView):
     """
     Production-ready webhook handler for Eversend payments
     with proper security, validation, and error handling.
     """
+
     authentication_classes = []
     permission_classes = []
     throttle_classes = [EversendWebhookThrottle]
@@ -91,13 +96,17 @@ class EversendWebhookView(APIView):
         raw_body = request.body
         headers = {k.lower(): v for k, v in request.headers.items()}
         client_ip = get_client_ip(request)
-        
+
         # Log incoming webhook request
-        log_transaction(f"Webhook received from IP: {client_ip}, Headers: {dict(headers)}")
+        log_transaction(
+            f"Webhook received from IP: {client_ip}, Headers: {dict(headers)}"
+        )
 
         # Verify webhook signature
         if not verify_webhook(headers, raw_body):
-            log_transaction(f"Webhook signature verification failed from IP: {client_ip}", "error")
+            log_transaction(
+                f"Webhook signature verification failed from IP: {client_ip}", "error"
+            )
             insert_audit_log(
                 uuid="system",
                 action=f"Failed webhook signature verification from IP: {client_ip}",
@@ -105,27 +114,32 @@ class EversendWebhookView(APIView):
                 ip_address=client_ip,
             )
             return Response(
-                {"detail": "Invalid signature"}, 
-                status=status.HTTP_401_UNAUTHORIZED
+                {"detail": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED
             )
 
         # Parse payload
         try:
-            payload = request.data if isinstance(request.data, dict) else json.loads(raw_body.decode("utf-8"))
+            payload = (
+                request.data
+                if isinstance(request.data, dict)
+                else json.loads(raw_body.decode("utf-8"))
+            )
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             log_transaction(f"Invalid JSON payload from IP {client_ip}: {e}", "error")
             return Response(
-                {"detail": "Invalid JSON payload"}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         # Validate payload structure
         is_valid, validation_error = validate_eversend_payload(payload)
         if not is_valid:
-            log_transaction(f"Invalid payload structure from IP {client_ip}: {validation_error}", "error")
+            log_transaction(
+                f"Invalid payload structure from IP {client_ip}: {validation_error}",
+                "error",
+            )
             return Response(
-                {"detail": f"Invalid payload: {validation_error}"}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": f"Invalid payload: {validation_error}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Extract payload data
@@ -151,33 +165,35 @@ class EversendWebhookView(APIView):
                 if not transaction_ref:
                     log_transaction("Missing transaction reference in webhook", "error")
                     return Response(
-                        {"detail": "Missing transaction reference"}, 
-                        status=status.HTTP_400_BAD_REQUEST
+                        {"detail": "Missing transaction reference"},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
 
                 # Update transaction status
                 updated_count = Transaction.objects.filter(
                     transaction_ref=transaction_ref
-                ).update(
-                    status=status_str, 
-                    transaction_id=transaction_id
-                )
-                
+                ).update(status=status_str, transaction_id=transaction_id)
+
                 if updated_count == 0:
-                    log_transaction(f"No transaction found for ref: {transaction_ref}", "warning")
+                    log_transaction(
+                        f"No transaction found for ref: {transaction_ref}", "warning"
+                    )
                     # Return 200 to prevent webhook retries for non-existent transactions
                     return Response(
-                        {"detail": "Transaction not found, but acknowledged"}, 
-                        status=status.HTTP_200_OK
+                        {"detail": "Transaction not found, but acknowledged"},
+                        status=status.HTTP_200_OK,
                     )
 
                 # Get updated transaction
                 tx = get_transaction_by_ref(transaction_ref)
                 if not tx:
-                    log_transaction(f"Failed to retrieve transaction after update: {transaction_ref}", "error")
+                    log_transaction(
+                        f"Failed to retrieve transaction after update: {transaction_ref}",
+                        "error",
+                    )
                     return Response(
-                        {"detail": "Internal error"}, 
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        {"detail": "Internal error"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
                 # Use database values as canonical source
@@ -204,8 +220,12 @@ class EversendWebhookView(APIView):
                     ip_address=client_ip,
                 )
 
-            log_transaction(f"Successfully processed webhook for transaction: {transaction_ref}")
-            return Response({"detail": "Webhook processed successfully"}, status=status.HTTP_200_OK)
+            log_transaction(
+                f"Successfully processed webhook for transaction: {transaction_ref}"
+            )
+            return Response(
+                {"detail": "Webhook processed successfully"}, status=status.HTTP_200_OK
+            )
 
         except Exception as e:
             log_transaction(f"Error processing webhook: {e}", "error")
@@ -217,16 +237,24 @@ class EversendWebhookView(APIView):
                 ip_address=client_ip,
             )
             return Response(
-                {"detail": "Internal server error"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"detail": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _process_successful_wallet_load(self, uuid: str, currency: str, amount: Decimal, 
-                                      service_fee: Decimal, transaction_ref: str):
+    def _process_successful_wallet_load(
+        self,
+        uuid: str,
+        currency: str,
+        amount: Decimal,
+        service_fee: Decimal,
+        transaction_ref: str,
+    ):
         """Process successful wallet load transaction"""
-        if not update_wallet_amount(uuid=uuid, currency=currency, amount=amount, is_add=True):
+        if not update_wallet_amount(
+            uuid=uuid, currency=currency, amount=amount, is_add=True
+        ):
             raise Exception("Failed to update wallet amount")
-            
+
         if not insert_payment(
             user_uuid=uuid,
             order_id=None,
@@ -236,16 +264,26 @@ class EversendWebhookView(APIView):
             status="completed",
         ):
             raise Exception("Failed to insert payment record")
-            
-        if not update_commission(currency=currency, service_fee=service_fee, is_add=True):
+
+        if not update_commission(
+            currency=currency, service_fee=service_fee, is_add=True
+        ):
             raise Exception("Failed to update commission")
 
-    def _process_failed_payout(self, uuid: str, currency: str, amount: Decimal, 
-                             service_fee: Decimal, transaction_ref: str):
+    def _process_failed_payout(
+        self,
+        uuid: str,
+        currency: str,
+        amount: Decimal,
+        service_fee: Decimal,
+        transaction_ref: str,
+    ):
         """Process failed payout transaction (refund)"""
-        if not update_wallet_amount(uuid=uuid, currency=currency, amount=amount, is_add=True):
+        if not update_wallet_amount(
+            uuid=uuid, currency=currency, amount=amount, is_add=True
+        ):
             raise Exception("Failed to refund wallet amount")
-            
+
         if not insert_payment(
             user_uuid=uuid,
             order_id=None,
@@ -255,6 +293,8 @@ class EversendWebhookView(APIView):
             status="reversed",
         ):
             raise Exception("Failed to insert refund payment record")
-            
-        if not update_commission(currency=currency, service_fee=service_fee, is_add=False):
+
+        if not update_commission(
+            currency=currency, service_fee=service_fee, is_add=False
+        ):
             raise Exception("Failed to reverse commission")
