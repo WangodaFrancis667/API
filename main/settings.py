@@ -54,12 +54,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Third party apps
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-
     # local apps
     "accounts",
     "APIHealth",
@@ -69,8 +67,8 @@ INSTALLED_APPS = [
     "notifications",
     "orders",
     "force_update",
-    'earnings',
-    'eversend_payments',
+    "earnings",
+    "eversend_payments",
 ]
 
 MIDDLEWARE = [
@@ -155,6 +153,14 @@ SUPPORT_EMAIL = "info@afrobuyug.com"
 VERIFICATION_BCC = []  # optional list of emails to BCC
 SUPPORT_WHATSAPP = "+256709328790"
 WHATSAPP_URL = f"https://wa.me/{SUPPORT_WHATSAPP}"
+
+
+# Eversend transactions secrets loading
+EVERSEND_CLIENT_ID = os.environ.get("EVERSEND_CLIENT_ID", "")
+EVERSEND_CLIENT_SECRET = os.environ.get("EVERSEND_CLIENT_SECRET", "")
+EVERSEND_WEBHOOK_SECRET = os.environ.get(
+    "EVERSEND_WEBHOOK_SECRET", ""
+)  # optional HMAC if you add signature checks
 
 
 # Password validation
@@ -360,11 +366,17 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "format": "[{asctime}] [{levelname}] {name}: {message}",
             "style": "{",
         },
     },
     "handlers": {
+        "payments_file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "payments.log"),
+            "formatter": "verbose",
+        },
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
@@ -385,6 +397,11 @@ LOGGING = {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": True,
+        },
+        "eversend_payments": {
+            "handlers": ["payments_file", "console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
