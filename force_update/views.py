@@ -57,8 +57,8 @@ class ForceUpdateView(APIView):
         # Load or create configuration
         config = self._get_or_create_config(platform)
 
-        # Fetch from store if requested and conditions are met
-        if fetch_from_store and self._should_fetch_from_store(config):
+        # Always try to get fresh store data if it's stale or missing
+        if self._should_fetch_from_store(config) or fetch_from_store:
             self._fetch_and_update_store_versions(config)
             # Reload config after potential updates
             config = self._get_or_create_config(platform, bypass_cache=True)
@@ -88,10 +88,6 @@ class ForceUpdateView(APIView):
         self._log_force_check(
             request, current_build, current_version, platform, test_scenario, response
         )
-
-        # Add testing instructions for development
-        if not test_scenario and current_build == 0:
-            response["testing_instructions"] = self._get_testing_instructions(platform)
 
         return Response(response, status=status.HTTP_200_OK)
 
@@ -339,75 +335,66 @@ class ForceUpdateView(APIView):
         soft_threshold,
         platform,
     ):
-        """Build the standardized response object."""
+        """Build a clean, professional response object with only essential information."""
+
+        # Get the latest store data for this platform
+        latest_store_data = self._get_latest_store_data(platform)
+
+        # Use store data if available, otherwise fallback to config
+        if latest_store_data:
+            latest_version = latest_store_data.get("version_name", latest_version)
+            if platform == "android" and latest_store_data.get("version_code"):
+                latest_build = latest_store_data.get("version_code")
 
         messages = {
-            "force": f"Critical update required! This version of AfroBuy is no longer supported. Please update immediately to continue using the app.",
-            "recommended": f"Important update available! Please update AfroBuy to get the latest features and security improvements.",
-            "optional": f"New version available! Update AfroBuy to get the latest features and improvements.",
-            "available": f"Latest version available with new features and improvements.",
-            "none": f"You're using the latest version of AfroBuy!",
+            "force": "Critical update required! Please update immediately to continue using the app.",
+            "recommended": "Important update available! Please update to get the latest features and security improvements.",
+            "optional": "New version available! Update to get the latest features and improvements.",
+            "available": "Latest version available with new features and improvements.",
+            "none": "You're using the latest version!",
         }
 
         update_message = messages.get(update_type, messages["none"])
 
+        # Build clean response with only essential fields
         response = {
-            "minimum_required_version_code": minimum_required,
-            "latest_version_name": latest_version,
-            "latest_version_code": latest_build,
-            "force_update": is_force_update,
-            "update_message": update_message,
             "update_required": update_required,
+            "force_update": is_force_update,
             "update_type": update_type,
-            "current_version_supported": not is_force_update,
-            "soft_update_threshold": soft_threshold,
-            # Platform specific fields
+            "update_message": update_message,
+            "latest_version": latest_version,
+            "latest_version_code": latest_build if platform == "android" else None,
+            "latest_build_number": latest_build if platform == "ios" else None,
+            "minimum_required_version_code": (
+                minimum_required if platform == "android" else None
+            ),
+            "minimum_required_build_number": (
+                minimum_required if platform == "ios" else None
+            ),
             "store_url": store_url,
-            "play_store_url": store_url if platform == "android" else None,
-            "app_store_url": store_url if platform == "ios" else None,
-            # Backward compatibility
-            "version": latest_version,
-            "build": latest_build,
-            "min_required_version": latest_version,
-            "update_date": date.today().isoformat(),
-            "update_available": update_required,
-            # Debug information
-            "debug_info": {
-                "test_scenario": test_scenario or "production",
-                "current_app_version": current_version,
-                "current_build_number": current_build,
-                "platform": platform,
-                "timestamp": date.today().isoformat(),
-                "comparison_result": {
-                    "is_below_minimum": current_build < minimum_required,
-                    "is_below_soft_threshold": current_build < soft_threshold,
-                    "is_below_latest": current_build < latest_build,
-                },
-                "config_info": {
-                    "auto_fetch_enabled": config.auto_fetch_store_info,
-                    "last_store_check": (
-                        config.last_store_check.isoformat()
-                        if config.last_store_check
-                        else None
-                    ),
-                },
-            },
-            "api_version": "3.0",
-            "status": "success",
+            "platform": platform,
         }
 
-        # Add iOS specific fields if platform is iOS
-        if platform == "ios":
-            response.update(
-                {
-                    "ios_minimum_required_build": config.ios_minimum_required_build,
-                    "ios_latest_version_name": config.ios_latest_version_name,
-                    "ios_latest_build_number": config.ios_latest_build_number,
-                    "ios_soft_update_build": config.ios_soft_update_build,
-                }
-            )
+        # Remove null values to keep response clean
+        response = {k: v for k, v in response.items() if v is not None}
 
         return response
+
+    def _get_latest_store_data(self, platform):
+        """Get the latest store version data from the database."""
+        try:
+            latest_check = (
+                StoreVersionCheck.objects.filter(platform=platform, status="success")
+                .order_by("-checked_at")
+                .first()
+            )
+
+            if latest_check and latest_check.response_data:
+                return latest_check.response_data
+        except Exception as e:
+            logger.warning(f"Failed to get latest store data for {platform}: {e}")
+
+        return None
 
     def _get_testing_instructions(self, platform):
         """Get testing instructions for the platform."""
