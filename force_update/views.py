@@ -1,185 +1,516 @@
-from datetime import date
+from datetime import date, timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import ForceUpdateConfig
-from .serializers import ForceUpdateSerializer
-from .tasks import record_force_check  # optional background logging
+from .models import ForceUpdateConfig, StoreVersionCheck
+from .serializers import (
+    ForceUpdateSerializer,
+    ForceUpdateConfigSerializer,
+    StoreVersionCheckSerializer,
+)
+from .services import get_store_service
+from .tasks import record_force_check, fetch_store_versions_task
 
-CACHE_KEY = "force_update:config:production"
-CACHE_TIMEOUT = getattr(settings, "FORCE_UPDATE_CACHE_TIMEOUT", 60)  # seconds
+import logging
 
-# Helper: compute response
-def _compute_update_response(cfg, current_build_number: int, current_version: str, test_scenario: str):
-    minimum_required_version_code = cfg.minimum_required_version_code
-    latest_version_name = cfg.latest_version_name
-    latest_version_code = cfg.latest_version_code
-    force_update_enabled = cfg.force_update
-    soft_update_version_code = cfg.soft_update_version_code or (minimum_required_version_code - 1)
-    play_store_url = cfg.play_store_url or getattr(settings, "PLAY_STORE_URL", "")
+logger = logging.getLogger(__name__)
 
-    update_required = False
-    is_force_update = False
-    update_type = "none"
-
-    if current_build_number > 0:
-        if current_build_number < minimum_required_version_code:
-            update_required = True
-            is_force_update = force_update_enabled
-            update_type = "force" if force_update_enabled else "recommended"
-        elif current_build_number < soft_update_version_code:
-            update_required = True
-            is_force_update = False
-            update_type = "optional"
-        elif current_build_number < latest_version_code:
-            update_required = True
-            is_force_update = False
-            update_type = "available"
-    # messages
-    messages = {
-        "force": "Critical update required! This version of AfroBuy is no longer supported. Please update immediately to continue using the app.",
-        "recommended": "Important update available! Please update AfroBuy to get the latest features and security improvements.",
-        "optional": "New version available! Update AfroBuy to get the latest features and improvements.",
-        "available": "Latest version available with new features and improvements.",
-        "none": "You're using the latest version of AfroBuy!",
-    }
-    update_message = messages.get(update_type, messages["none"])
-
-    response = {
-        "minimum_required_version_code": minimum_required_version_code,
-        "latest_version_name": latest_version_name,
-        "latest_version_code": latest_version_code,
-        "force_update": is_force_update,
-        "update_message": update_message,
-        "play_store_url": play_store_url,
-        "update_required": update_required,
-        "update_type": update_type,
-        "current_version_supported": not is_force_update,
-        "soft_update_threshold": soft_update_version_code,
-        # backward compatibility
-        "version": latest_version_name,
-        "build": latest_version_code,
-        "store_url": play_store_url,
-        "min_required_version": latest_version_name,
-        "update_date": date.today().isoformat(),
-        "update_available": update_required,
-        "debug_info": {
-            "test_scenario": test_scenario or "production",
-            "current_app_version": current_version,
-            "current_build_number": current_build_number,
-            "platform": "android",
-            "timestamp": date.today().isoformat(),
-            "comparison_result": {
-                "is_below_minimum": current_build_number < minimum_required_version_code,
-                "is_below_soft_threshold": current_build_number < soft_update_version_code,
-                "is_below_latest": current_build_number < latest_version_code,
-            }
-        },
-        "api_version": "2.0",
-        "status": "success",
-    }
-    return response
+CACHE_KEY_PREFIX = "force_update:config"
+CACHE_TIMEOUT = getattr(
+    settings, "FORCE_UPDATE_CACHE_TIMEOUT", 300
+)  # 5 minutes default
 
 
 class ForceUpdateView(APIView):
     """
-    Endpoint: GET /api/force-update/
-    Returns a JSON response indicating whether the client must/should update.
+    Enhanced Force Update endpoint that supports both Android and iOS platforms.
+
+    Endpoints:
+    - GET /api/updates/force-update/ - Main force update check
+
     Query parameters:
-      - current_version or app_version
-      - current_build or build_number
-      - test_force_update / test_optional_update / test_no_update (flags)
+    - platform: 'android' or 'ios' (default: android)
+    - current_version or app_version: Current app version string
+    - current_build or build_number: Current build/version code number
+    - fetch_from_store: Whether to fetch latest info from stores (default: false)
+    - test_force_update/test_optional_update/test_no_update: Test flags
     """
 
     permission_classes = []  # public endpoint
-    throttle_scope = "anon"  # consider rate-limiting if needed
+    throttle_scope = "anon"
 
     def get(self, request, *args, **kwargs):
         serializer = ForceUpdateSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        platform = data.get("platform", "android")
+        fetch_from_store = data.get("fetch_from_store", False)
+
         # Decide test scenario
-        test_scenario = ""
-        if data.get("test_force_update"):
-            test_scenario = "force_update"
-        elif data.get("test_optional_update"):
-            test_scenario = "optional_update"
-        elif data.get("test_no_update"):
-            test_scenario = "no_update"
+        test_scenario = self._determine_test_scenario(data)
 
-        # load config (cache for speed)
-        cfg = cache.get(CACHE_KEY)
-        if not cfg:
-            # ensure there is a production config; otherwise fallback to defaults
-            try:
-                cfg = ForceUpdateConfig.objects.get(name="production")
-            except ForceUpdateConfig.DoesNotExist:
-                # Build ephemeral default config
-                cfg = ForceUpdateConfig(
-                    name="production",
-                    minimum_required_version_code=getattr(settings, "MIN_REQUIRED_VERSION_CODE", 1),
-                    latest_version_name=getattr(settings, "LATEST_VERSION_NAME", "1.0.7"),
-                    latest_version_code=getattr(settings, "LATEST_VERSION_CODE", 1),
-                    force_update=getattr(settings, "FORCE_UPDATE_ENABLED", False),
-                    soft_update_version_code=getattr(settings, "SOFT_UPDATE_VERSION_CODE", None),
-                    play_store_url=getattr(settings, "PLAY_STORE_URL", ""),
-                )
-            cache.set(CACHE_KEY, cfg, CACHE_TIMEOUT)
+        # Load or create configuration
+        config = self._get_or_create_config(platform)
 
-        # If test scenario requested, we allow temporary overrides
-        current_build_number = int(request.query_params.get("build_number") or request.query_params.get("current_build") or 0)
-        current_version = request.query_params.get("app_version") or request.query_params.get("current_version") or ""
+        # Fetch from store if requested and conditions are met
+        if fetch_from_store and self._should_fetch_from_store(config):
+            self._fetch_and_update_store_versions(config)
+            # Reload config after potential updates
+            config = self._get_or_create_config(platform, bypass_cache=True)
 
-        # allow explicit simulation of build via test flags (mirrors your PHP logic)
+        # Extract client version info
+        current_version = data.get("current_version", "")
+        current_build = data.get("current_build", 0)
+
+        # Apply test scenario overrides
         if test_scenario:
-            ts = {
-                "force_update": dict(minimum_required_version_code=cfg.minimum_required_version_code,
-                                     latest_version_name=cfg.latest_version_name,
-                                     latest_version_code=cfg.latest_version_code,
-                                     force_update=cfg.force_update,
-                                     current_build_simulation=cfg.latest_version_code),
-                "optional_update": dict(minimum_required_version_code=cfg.minimum_required_version_code,
-                                        latest_version_name=cfg.latest_version_name,
-                                        latest_version_code=cfg.latest_version_code,
-                                        force_update=False,
-                                        current_build_simulation=max(0, (cfg.soft_update_version_code or cfg.minimum_required_version_code) - 1)),
-                "no_update": dict(minimum_required_version_code=cfg.minimum_required_version_code,
-                                  latest_version_name=cfg.latest_version_name,
-                                  latest_version_code=cfg.latest_version_code,
-                                  force_update=False,
-                                  current_build_simulation=cfg.latest_version_code),
-            }.get(test_scenario)
+            current_build = self._apply_test_scenario(config, test_scenario, platform)
 
-            current_build_number = ts["current_build_simulation"]
+        # Compute response based on platform
+        if platform == "ios":
+            response = self._compute_ios_update_response(
+                config, current_build, current_version, test_scenario
+            )
+        else:
+            response = self._compute_android_update_response(
+                config, current_build, current_version, test_scenario
+            )
 
-        # compute response
-        response = _compute_update_response(cfg, current_build_number, current_version, test_scenario)
+        # Add platform to response
+        response["platform"] = platform
 
-        # optionally fire an async task that logs the check (non-blocking)
-        try:
-            record_force_check.delay({
-                "current_build": current_build_number,
-                "current_version": current_version,
-                "client_ip": request.META.get("REMOTE_ADDR", ""),
-                "test_scenario": test_scenario,
-                "timestamp": response["debug_info"]["timestamp"],
-            })
-        except Exception:
-            # if celery missing just pass
-            pass
+        # Log the check asynchronously
+        self._log_force_check(
+            request, current_build, current_version, platform, test_scenario, response
+        )
 
-        # If no custom query flags and no explicit build param, provide testing instructions
-        if not test_scenario and current_build_number == 0:
-            response["testing_instructions"] = {
-                "force_update_test": "?test_force_update=true",
-                "optional_update_test": "?test_optional_update=true",
-                "no_update_test": "?test_no_update=true",
-                "custom_test": "?current_version=1.0.4&current_build=8",
-                "note": "Add these parameters to the URL to test different scenarios"
-            }
+        # Add testing instructions for development
+        if not test_scenario and current_build == 0:
+            response["testing_instructions"] = self._get_testing_instructions(platform)
 
         return Response(response, status=status.HTTP_200_OK)
+
+    def _determine_test_scenario(self, data):
+        """Determine which test scenario to apply."""
+        if data.get("test_force_update"):
+            return "force_update"
+        elif data.get("test_optional_update"):
+            return "optional_update"
+        elif data.get("test_no_update"):
+            return "no_update"
+        return ""
+
+    def _get_or_create_config(self, platform, bypass_cache=False):
+        """Get or create force update configuration for the platform."""
+        cache_key = f"{CACHE_KEY_PREFIX}:{platform}"
+
+        if not bypass_cache:
+            config = cache.get(cache_key)
+            if config:
+                return config
+
+        try:
+            config = ForceUpdateConfig.objects.get(
+                name="production", platform__in=[platform, "universal"]
+            )
+        except ForceUpdateConfig.DoesNotExist:
+            # Create default configuration
+            config = self._create_default_config(platform)
+
+        cache.set(cache_key, config, CACHE_TIMEOUT)
+        return config
+
+    def _create_default_config(self, platform):
+        """Create default configuration for the platform."""
+        defaults = {
+            "name": "production",
+            "platform": "universal",
+            "minimum_required_version_code": getattr(
+                settings, "MIN_REQUIRED_VERSION_CODE", 1
+            ),
+            "latest_version_name": getattr(settings, "LATEST_VERSION_NAME", "1.0.7"),
+            "latest_version_code": getattr(settings, "LATEST_VERSION_CODE", 1),
+            "force_update": getattr(settings, "FORCE_UPDATE_ENABLED", False),
+            "play_store_url": getattr(settings, "PLAY_STORE_URL", ""),
+            "android_package_id": getattr(settings, "ANDROID_PACKAGE_ID", ""),
+        }
+
+        if platform == "ios":
+            defaults.update(
+                {
+                    "ios_minimum_required_build": getattr(
+                        settings, "IOS_MIN_REQUIRED_BUILD", 1
+                    ),
+                    "ios_latest_version_name": getattr(
+                        settings, "IOS_LATEST_VERSION_NAME", "1.0.7"
+                    ),
+                    "ios_latest_build_number": getattr(
+                        settings, "IOS_LATEST_BUILD_NUMBER", 1
+                    ),
+                    "app_store_url": getattr(settings, "APP_STORE_URL", ""),
+                    "ios_app_id": getattr(settings, "IOS_APP_ID", ""),
+                    "ios_bundle_id": getattr(settings, "IOS_BUNDLE_ID", ""),
+                }
+            )
+
+        return ForceUpdateConfig(**defaults)
+
+    def _should_fetch_from_store(self, config):
+        """Check if we should fetch version info from stores."""
+        if not config.auto_fetch_store_info:
+            return False
+
+        if not config.last_store_check:
+            return True
+
+        time_since_check = timezone.now() - config.last_store_check
+        return time_since_check >= timedelta(hours=config.store_check_interval_hours)
+
+    def _fetch_and_update_store_versions(self, config):
+        """Fetch version information from stores and update config."""
+        try:
+            # Use async task for better performance
+            fetch_store_versions_task.delay(config.id)
+        except Exception as e:
+            logger.warning(f"Failed to trigger store version fetch task: {e}")
+            # Fallback to synchronous fetch
+            self._sync_fetch_store_versions(config)
+
+    def _sync_fetch_store_versions(self, config):
+        """Synchronously fetch and update store versions."""
+        store_service = get_store_service()
+        updated = False
+
+        # Fetch Android version if configured
+        if config.android_package_id:
+            android_info, error = store_service.get_google_play_version(
+                config.android_package_id
+            )
+            if android_info and android_info.get("version_name"):
+                config.latest_version_name = android_info["version_name"]
+                if android_info.get("version_code"):
+                    config.latest_version_code = android_info["version_code"]
+                updated = True
+
+        # Fetch iOS version if configured
+        if config.ios_app_id:
+            ios_info, error = store_service.get_app_store_version(
+                config.ios_app_id, config.ios_bundle_id
+            )
+            if ios_info and ios_info.get("version_name"):
+                config.ios_latest_version_name = ios_info["version_name"]
+                config.app_store_url = ios_info.get(
+                    "app_store_url", config.app_store_url
+                )
+                updated = True
+
+        if updated:
+            config.last_store_check = timezone.now()
+            if hasattr(config, "save"):  # Only save if it's a real model instance
+                config.save()
+
+    def _apply_test_scenario(self, config, test_scenario, platform):
+        """Apply test scenario to simulate different update conditions."""
+        if platform == "ios":
+            latest_build = config.ios_latest_build_number or 1
+            min_required = config.ios_minimum_required_build or 1
+            soft_threshold = config.ios_soft_update_build or (min_required - 1)
+        else:
+            latest_build = config.latest_version_code
+            min_required = config.minimum_required_version_code
+            soft_threshold = config.soft_update_version_code or (min_required - 1)
+
+        scenarios = {
+            "force_update": max(0, min_required - 1),
+            "optional_update": max(0, soft_threshold - 1),
+            "no_update": latest_build,
+        }
+
+        return scenarios.get(test_scenario, 0)
+
+    def _compute_android_update_response(
+        self, config, current_build, current_version, test_scenario
+    ):
+        """Compute update response for Android platform."""
+        minimum_required = config.minimum_required_version_code
+        latest_version = config.latest_version_name
+        latest_build = config.latest_version_code
+        force_update_enabled = config.force_update
+        soft_threshold = config.soft_update_version_code or (minimum_required - 1)
+        store_url = config.play_store_url or getattr(settings, "PLAY_STORE_URL", "")
+
+        update_required = False
+        is_force_update = False
+        update_type = "none"
+
+        if current_build > 0:
+            if current_build < minimum_required:
+                update_required = True
+                is_force_update = force_update_enabled
+                update_type = "force" if force_update_enabled else "recommended"
+            elif current_build < soft_threshold:
+                update_required = True
+                is_force_update = False
+                update_type = "optional"
+            elif current_build < latest_build:
+                update_required = True
+                is_force_update = False
+                update_type = "available"
+
+        return self._build_response(
+            config,
+            current_build,
+            current_version,
+            test_scenario,
+            minimum_required,
+            latest_version,
+            latest_build,
+            is_force_update,
+            update_required,
+            update_type,
+            store_url,
+            soft_threshold,
+            "android",
+        )
+
+    def _compute_ios_update_response(
+        self, config, current_build, current_version, test_scenario
+    ):
+        """Compute update response for iOS platform."""
+        minimum_required = config.ios_minimum_required_build or 1
+        latest_version = config.ios_latest_version_name or config.latest_version_name
+        latest_build = config.ios_latest_build_number or 1
+        force_update_enabled = config.force_update
+        soft_threshold = config.ios_soft_update_build or (minimum_required - 1)
+        store_url = config.app_store_url or getattr(settings, "APP_STORE_URL", "")
+
+        update_required = False
+        is_force_update = False
+        update_type = "none"
+
+        if current_build > 0:
+            if current_build < minimum_required:
+                update_required = True
+                is_force_update = force_update_enabled
+                update_type = "force" if force_update_enabled else "recommended"
+            elif current_build < soft_threshold:
+                update_required = True
+                is_force_update = False
+                update_type = "optional"
+            elif current_build < latest_build:
+                update_required = True
+                is_force_update = False
+                update_type = "available"
+
+        return self._build_response(
+            config,
+            current_build,
+            current_version,
+            test_scenario,
+            minimum_required,
+            latest_version,
+            latest_build,
+            is_force_update,
+            update_required,
+            update_type,
+            store_url,
+            soft_threshold,
+            "ios",
+        )
+
+    def _build_response(
+        self,
+        config,
+        current_build,
+        current_version,
+        test_scenario,
+        minimum_required,
+        latest_version,
+        latest_build,
+        is_force_update,
+        update_required,
+        update_type,
+        store_url,
+        soft_threshold,
+        platform,
+    ):
+        """Build the standardized response object."""
+
+        messages = {
+            "force": f"Critical update required! This version of AfroBuy is no longer supported. Please update immediately to continue using the app.",
+            "recommended": f"Important update available! Please update AfroBuy to get the latest features and security improvements.",
+            "optional": f"New version available! Update AfroBuy to get the latest features and improvements.",
+            "available": f"Latest version available with new features and improvements.",
+            "none": f"You're using the latest version of AfroBuy!",
+        }
+
+        update_message = messages.get(update_type, messages["none"])
+
+        response = {
+            "minimum_required_version_code": minimum_required,
+            "latest_version_name": latest_version,
+            "latest_version_code": latest_build,
+            "force_update": is_force_update,
+            "update_message": update_message,
+            "update_required": update_required,
+            "update_type": update_type,
+            "current_version_supported": not is_force_update,
+            "soft_update_threshold": soft_threshold,
+            # Platform specific fields
+            "store_url": store_url,
+            "play_store_url": store_url if platform == "android" else None,
+            "app_store_url": store_url if platform == "ios" else None,
+            # Backward compatibility
+            "version": latest_version,
+            "build": latest_build,
+            "min_required_version": latest_version,
+            "update_date": date.today().isoformat(),
+            "update_available": update_required,
+            # Debug information
+            "debug_info": {
+                "test_scenario": test_scenario or "production",
+                "current_app_version": current_version,
+                "current_build_number": current_build,
+                "platform": platform,
+                "timestamp": date.today().isoformat(),
+                "comparison_result": {
+                    "is_below_minimum": current_build < minimum_required,
+                    "is_below_soft_threshold": current_build < soft_threshold,
+                    "is_below_latest": current_build < latest_build,
+                },
+                "config_info": {
+                    "auto_fetch_enabled": config.auto_fetch_store_info,
+                    "last_store_check": (
+                        config.last_store_check.isoformat()
+                        if config.last_store_check
+                        else None
+                    ),
+                },
+            },
+            "api_version": "3.0",
+            "status": "success",
+        }
+
+        # Add iOS specific fields if platform is iOS
+        if platform == "ios":
+            response.update(
+                {
+                    "ios_minimum_required_build": config.ios_minimum_required_build,
+                    "ios_latest_version_name": config.ios_latest_version_name,
+                    "ios_latest_build_number": config.ios_latest_build_number,
+                    "ios_soft_update_build": config.ios_soft_update_build,
+                }
+            )
+
+        return response
+
+    def _get_testing_instructions(self, platform):
+        """Get testing instructions for the platform."""
+        base_instructions = {
+            "force_update_test": f"?platform={platform}&test_force_update=true",
+            "optional_update_test": f"?platform={platform}&test_optional_update=true",
+            "no_update_test": f"?platform={platform}&test_no_update=true",
+            "custom_test": f"?platform={platform}&current_version=1.0.4&current_build=8",
+            "fetch_from_store": f"?platform={platform}&fetch_from_store=true",
+            "note": "Add these parameters to the URL to test different scenarios",
+        }
+
+        if platform == "ios":
+            base_instructions["custom_test"] = (
+                f"?platform=ios&current_version=1.0.4&current_build=8"
+            )
+
+        return base_instructions
+
+    def _log_force_check(
+        self, request, current_build, current_version, platform, test_scenario, response
+    ):
+        """Log the force update check for analytics."""
+        try:
+            record_force_check.delay(
+                {
+                    "current_build": current_build,
+                    "current_version": current_version,
+                    "platform": platform,
+                    "client_ip": request.META.get("REMOTE_ADDR", ""),
+                    "test_scenario": test_scenario,
+                    "timestamp": response["debug_info"]["timestamp"],
+                    "update_required": response.get("update_required", False),
+                    "update_type": response.get("update_type", "none"),
+                    "user_agent": request.META.get("HTTP_USER_AGENT", ""),
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log force update check: {e}")
+
+
+class StoreVersionsView(APIView):
+    """
+    Endpoint to manually trigger store version checks and view recent checks.
+
+    GET /api/updates/store-versions/ - List recent version checks
+    POST /api/updates/store-versions/ - Trigger manual version check
+    """
+
+    permission_classes = []  # Consider adding authentication for POST requests
+
+    def get(self, request):
+        """Get recent store version checks."""
+        checks = StoreVersionCheck.objects.all()[:20]
+        serializer = StoreVersionCheckSerializer(checks, many=True)
+        return Response(
+            {
+                "status": "success",
+                "recent_checks": serializer.data,
+                "total_checks": StoreVersionCheck.objects.count(),
+            }
+        )
+
+    def post(self, request):
+        """Manually trigger store version checks."""
+        platform = request.data.get("platform", "both")
+
+        store_service = get_store_service()
+        results = {}
+
+        try:
+            config = ForceUpdateConfig.objects.get(name="production")
+
+            if platform in ["android", "both"] and config.android_package_id:
+                android_info, error = store_service.get_google_play_version(
+                    config.android_package_id
+                )
+                results["android"] = {
+                    "success": android_info is not None,
+                    "data": android_info,
+                    "error": error,
+                }
+
+            if platform in ["ios", "both"] and config.ios_app_id:
+                ios_info, error = store_service.get_app_store_version(
+                    config.ios_app_id, config.ios_bundle_id
+                )
+                results["ios"] = {
+                    "success": ios_info is not None,
+                    "data": ios_info,
+                    "error": error,
+                }
+
+        except ForceUpdateConfig.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Force update configuration not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Store version check completed",
+                "results": results,
+            }
+        )
