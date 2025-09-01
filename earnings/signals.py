@@ -10,22 +10,25 @@ def create_vendor_earnings(sender, instance, created, **kwargs):
     """
     Create vendor earnings record when order is completed
     """
-    # Only create earnings for completed orders
-    if instance.status == Order.STATUS_COMPLETED:
+    # Only create earnings for completed orders and shipped orders
+    if (
+        instance.status == Order.STATUS_COMPLETED
+        or instance.status == Order.STATUS_SHIPPED
+    ):
         # Check if earnings record already exists
-        if not hasattr(instance, 'earnings'):
+        if not hasattr(instance, "earnings"):
             # Get commission rate from vendor profile if available
-            commission_rate = Decimal('10.00')  # Default 10%
-            
-            if hasattr(instance.vendor, 'vendor_profile'):
+            commission_rate = Decimal("10.00")  # Default 10%
+
+            if hasattr(instance.vendor, "vendor_profile"):
                 commission_rate = instance.vendor.vendor_profile.commission_rate
-            
+
             # Create earnings record
             VendorEarnings.objects.create(
                 vendor=instance.vendor,
                 order=instance,
                 gross_amount=instance.total_amount,
-                commission_rate=commission_rate
+                commission_rate=commission_rate,
             )
 
 
@@ -37,14 +40,16 @@ def handle_order_status_change(sender, instance, **kwargs):
     if instance.pk:
         try:
             old_instance = Order.objects.get(pk=instance.pk)
-            
+
             # If order was cancelled, mark earnings as cancelled if they exist
-            if (old_instance.status != Order.STATUS_CANCELLED and 
-                instance.status == Order.STATUS_CANCELLED):
-                
-                if hasattr(instance, 'earnings'):
+            if (
+                old_instance.status != Order.STATUS_CANCELLED
+                and instance.status == Order.STATUS_CANCELLED
+            ):
+
+                if hasattr(instance, "earnings"):
                     # You might want to handle cancellation logic here
                     pass
-                    
+
         except Order.DoesNotExist:
             pass
