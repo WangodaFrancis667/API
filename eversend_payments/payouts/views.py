@@ -248,41 +248,41 @@ class PayoutQuotationView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-            resp_data = response.json()
-            quotation = resp_data["data"]["quotation"]
+            # resp_data = response.json()
+            # quotation = resp_data["data"]["quotation"]
 
-            withdraw_fee = 0.02  # Example: fetch from settings or DB
-            service_fee = round(data["amount"] * withdraw_fee, 2)
-            total_fees = quotation["totalFees"] + service_fee
-            final_total = data["amount"] + total_fees
+            # withdraw_fee = 0.02  # Example: fetch from settings or DB
+            # service_fee = round(data["amount"] * withdraw_fee, 2)
+            # total_fees = quotation["totalFees"] + service_fee
+            # final_total = data["amount"] + total_fees
 
-            # Check wallet balance
-            wallet = Wallet.objects.filter(
-                uuid=data["uuid"], currency=data["sourceWallet"]
-            ).first()
-            if not wallet or wallet.amount < final_total:
-                return JsonResponse(
-                    {
-                        "status": "error",
-                        "message": "Insufficient wallet balance",
-                        "rate": quotation["exchangeRate"],
-                        "totalAmountRequired": final_total,
-                        "service_fee": service_fee,
-                        "total_fees": total_fees,
-                    },
-                    status=400,
-                )
+            # # Check wallet balance
+            # wallet = Wallet.objects.filter(
+            #     uuid=data["uuid"], currency=data["sourceWallet"]
+            # ).first()
+            # if not wallet or wallet.amount < final_total:
+            #     return JsonResponse(
+            #         {
+            #             "status": "error",
+            #             "message": "Insufficient wallet balance",
+            #             "rate": quotation["exchangeRate"],
+            #             "totalAmountRequired": final_total,
+            #             "service_fee": service_fee,
+            #             "total_fees": total_fees,
+            #         },
+            #         status=400,
+            #     )
 
-            quotation.update(
-                {
-                    "service_fee": service_fee,
-                    "total_fees": total_fees,
-                    "totalAmountRequired": final_total,
-                }
-            )
-            resp_data["data"]["quotation"] = quotation
+            # quotation.update(
+            #     {
+            #         "service_fee": service_fee,
+            #         "total_fees": total_fees,
+            #         "totalAmountRequired": final_total,
+            #     }
+            # )
+            # resp_data["data"]["quotation"] = quotation
 
-            return JsonResponse(resp_data, status=200)
+            # return JsonResponse(resp_data, status=200)
 
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        # except Exception as e:
+        #     return JsonResponse({"status": "error", "message": str(e)}, status=500)
