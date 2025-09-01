@@ -143,7 +143,7 @@ curl -X GET "http://localhost:8000/api/orders/list/?group_id__isnull=true" \
 
 # 15. Update Order Status to Processing (Vendor/Admin)
 curl -X PUT http://localhost:8000/api/orders/status/ \
-  -H "Authorization: Bearer VENDOR_ACCESS_TOKEN" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU2MjA5ODkzLCJpYXQiOjE3NTYyMDYyOTMsImp0aSI6ImUxMWE5YzgwMGUzMjQwZDU5YzVlZjA2YjIzZGUyMTQ4IiwidXNlcl9pZCI6IjgifQ.NkYCs5jYwvquvbMhuAj8--FyupScGfTOrnhRU3PktvY" \
   -H "Content-Type: application/json" \
   -d '{
     "order_id": 1,
