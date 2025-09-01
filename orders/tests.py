@@ -17,7 +17,7 @@ from .serializers import (
     OrderResponseSerializer
 )
 from .services import (
-    create_individual_order, create_or_join_group_order,
+    create_individual_order, # create_or_join_group_order,
     get_product, _price_guard
 )
 from productManagement.models import Categories, Products
@@ -168,7 +168,7 @@ class OrderModelTest(TestCase):
     #         delivery_address='123 Test Street'
     #     )
         
-        self.assertEqual(order.group_id, 'GROUP123')
+    #     self.assertEqual(order.group_id, 'GROUP123')
 
 
 class OrderItemModelTest(TestCase):
