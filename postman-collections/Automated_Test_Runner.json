@@ -1,0 +1,665 @@
+{
+	"info": {
+		"_postman_id": "automated-test-runner",
+		"name": "🧪 Automated Test Runner Collection",
+		"description": "Automated test collection that runs end-to-end tests for all major API workflows with different user roles.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global pre-request script for test runner",
+					"pm.globals.set('test_timestamp', new Date().getTime());",
+					"pm.globals.set('random_suffix', Math.floor(Math.random() * 10000));"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test script",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"pm.test('Response has proper headers', function () {",
+					"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+					"});",
+					"",
+					"pm.test('No server errors (5xx)', function () {",
+					"    pm.expect(pm.response.code).to.be.below(500);",
+					"});"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "🏁 Setup Tests",
+			"item": [
+				{
+					"name": "🏥 Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('API is healthy', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Health check returns valid response', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔐 Authentication Workflow Tests",
+			"item": [
+				{
+					"name": "📝 Register New Buyer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('User registration successful', function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Registration returns tokens', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('tokens');",
+									"    pm.expect(response.tokens).to.have.property('access');",
+									"    pm.expect(response.tokens).to.have.property('refresh');",
+									"    ",
+									"    // Store tokens for future tests",
+									"    pm.globals.set('test_access_token', response.tokens.access);",
+									"    pm.globals.set('test_refresh_token', response.tokens.refresh);",
+									"    pm.globals.set('test_user_id', response.user.id);",
+									"});",
+									"",
+									"pm.test('User has buyer role', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.user.role).to.equal('buyer');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Test User {{random_suffix}}\",\n    \"username\": \"testuser{{random_suffix}}\",\n    \"phone\": \"+256700{{random_suffix}}\",\n    \"location\": \"Kampala\",\n    \"password\": \"TestPassword123!\",\n    \"confirm_password\": \"TestPassword123!\",\n    \"role\": \"buyer\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/signup/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"signup",
+								""
+							]
+						}
+					}
+				},
+				{
+					"name": "🔑 Login with Created User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Login successful', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Login returns valid tokens', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('access');",
+									"    pm.expect(response).to.have.property('refresh');",
+									"    ",
+									"    // Update tokens",
+									"    pm.globals.set('test_access_token', response.access);",
+									"    pm.globals.set('test_refresh_token', response.refresh);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"testuser{{random_suffix}}\",\n    \"password\": \"TestPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login",
+								""
+							]
+						}
+					}
+				},
+				{
+					"name": "🔄 Token Refresh Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Token refresh successful', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('New access token provided', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('access');",
+									"    pm.globals.set('test_access_token', response.access);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh\": \"{{test_refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/token/refresh/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"token",
+								"refresh",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👤 User Profile Tests",
+			"item": [
+				{
+					"name": "👁️ View Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Profile retrieved successfully', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Profile contains user data', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('id');",
+									"    pm.expect(response).to.have.property('username');",
+									"    pm.expect(response).to.have.property('role');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/profile/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"profile",
+								""
+							]
+						}
+					}
+				},
+				{
+					"name": "✏️ Update Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Profile update successful', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Profile updated with new data', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.full_name).to.include('Updated');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Updated Test User {{random_suffix}}\",\n    \"location\": \"Updated Location\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/update-profile/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"update-profile",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📦 Product Tests",
+			"item": [
+				{
+					"name": "📋 List Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Products list retrieved', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Products list is an array', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.results || response).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/view-products/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"view-products",
+								""
+							]
+						}
+					}
+				},
+				{
+					"name": "📂 List Categories",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Categories retrieved successfully', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Categories is an array', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/categories/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"categories",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔔 Notification Tests",
+			"item": [
+				{
+					"name": "📋 List Notifications",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Notifications retrieved', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has notifications data', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('results');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								""
+							]
+						}
+					}
+				},
+				{
+					"name": "📊 Unread Count",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Unread count retrieved', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Count is a number', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.unread_count).to.be.a('number');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notifications/unread-count/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"unread-count",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "⚙️ App Settings Tests",
+			"item": [
+				{
+					"name": "📋 List App Settings",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('App settings retrieved', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Settings is an array', function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/app/app-settings/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"app",
+								"app-settings",
+								""
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🚪 Cleanup Tests",
+			"item": [
+				{
+					"name": "🚪 Logout Test User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Logout successful', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Clear test tokens",
+									"pm.globals.unset('test_access_token');",
+									"pm.globals.unset('test_refresh_token');",
+									"pm.globals.unset('test_user_id');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{test_access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout",
+								""
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}
