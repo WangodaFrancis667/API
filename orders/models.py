@@ -33,6 +33,7 @@ class Order(models.Model):
     STATUS_PROCESSING = "processing"
     STATUS_SHIPPED = "shipped"
     STATUS_DELIVERED = "delivered"
+    STATUS_COMPLETED = "completed"  # Add completed status
     STATUS_CANCELLED = "cancelled"
 
     STATUS_CHOICES = [
@@ -40,13 +41,19 @@ class Order(models.Model):
         (STATUS_PROCESSING, "processing"),
         (STATUS_SHIPPED, "shipped"),
         (STATUS_DELIVERED, "delivered"),
+        (STATUS_COMPLETED, "completed"),  # Add completed status
         (STATUS_CANCELLED, "cancelled"),
     ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="orders"
     )
-    vendor_id = models.PositiveIntegerField()  # keep as int to mirror PHP
+    vendor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.PROTECT, 
+        related_name="vendor_orders",
+        limit_choices_to={'role': 'vendor'}
+    )
     # group_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     subtotal = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
@@ -67,7 +74,7 @@ class Order(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["user", "status"]),
-            models.Index(fields=["vendor_id"]),
+            models.Index(fields=["vendor"]),
             # models.Index(fields=["group_id"]),
         ]
 
