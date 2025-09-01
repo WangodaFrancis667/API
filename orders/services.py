@@ -11,7 +11,8 @@ from django.db.models import F
 from rest_framework import serializers
 
 from .models import (
-    GroupOrder, Order, OrderItem
+     Order, OrderItem,
+    # GroupOrder,
 )
 
 from notifications.services import (
