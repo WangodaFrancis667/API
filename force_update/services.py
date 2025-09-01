@@ -160,7 +160,7 @@ class StoreVersionService:
             # Store full data for database logging
             full_version_info = {
                 "version_name": app_info.get("version"),
-                "build_number": None,  # iTunes API doesn't provide build numbers
+                "build_number": None,  # Will try to extract below
                 "bundle_id": app_info.get("bundleId"),
                 "app_name": app_info.get("trackName"),
                 "release_date": app_info.get("currentVersionReleaseDate"),
@@ -173,13 +173,20 @@ class StoreVersionService:
                 "raw_data": app_info,
             }
 
+            # Try to extract build number from release notes if available
+            build_number = self._try_extract_build_number(
+                app_info.get("releaseNotes", ""), app_info.get("version", "")
+            )
+            if build_number:
+                full_version_info["build_number"] = build_number
+
             # Create minimal version info for API response
             version_info = {
                 "platform": "ios",
                 "app_id": app_id,
                 "version_code": None,  # iOS doesn't use version codes
                 "version_name": app_info.get("version"),
-                "build_number": None,  # iTunes API doesn't provide build numbers
+                "build_number": full_version_info.get("build_number"),
                 "app_name": app_info.get("trackName"),
             }
 
@@ -249,8 +256,11 @@ class StoreVersionService:
             # Try to extract version name using various patterns
             version_patterns = [
                 r'"versionName":"([^"]+)"',
+                r'"softwareVersion":"([^"]+)"',
                 r"Current Version[^>]*>([^<]{1,50})<",
                 r"Version[^>]*>([^<]{1,50})<",
+                r'<div[^>]*class="[^"]*version[^"]*"[^>]*>([^<]+)</div>',
+                r'<span[^>]*class="[^"]*version[^"]*"[^>]*>([^<]+)</span>',
                 r">\s*(\d+\.\d+\.?\d*)\s*<",
             ]
 
@@ -271,11 +281,34 @@ class StoreVersionService:
                         version_info["version_name"] = version_value
                         break
 
+            # Try to extract version code using various patterns
+            version_code_patterns = [
+                r'"versionCode":"?(\d+)"?',
+                r'"versionCode":(\d+)',
+                r'versionCode["\s:=]+(\d+)',
+                r'android:versionCode="(\d+)"',
+            ]
+
+            for pattern in version_code_patterns:
+                match = re.search(pattern, html_content, re.IGNORECASE)
+                if match:
+                    try:
+                        version_info["version_code"] = int(match.group(1))
+                        logger.info(
+                            f"Extracted version_code: {version_info['version_code']} for {package_id}"
+                        )
+                        break
+                    except ValueError:
+                        continue
+
             # Try to extract app name
             app_name_patterns = [
                 r'"name":"([^"]+)"',
+                r'"applicationName":"([^"]+)"',
                 r"<title>([^<]{1,100}) - Google Play</title>",
+                r"<h1[^>]*>([^<]{1,100})</h1>",
                 r'data-track-click="app-name">([^<]{1,100})</span>',
+                r'<span[^>]*class="[^"]*title[^"]*"[^>]*>([^<]{1,100})</span>',
             ]
 
             for pattern in app_name_patterns:
@@ -287,6 +320,7 @@ class StoreVersionService:
                         len(app_name_value) < 200
                         and not "<script" in app_name_value.lower()
                         and not "javascript" in app_name_value.lower()
+                        and not "google play" in app_name_value.lower()
                     ):
                         version_info["app_name"] = app_name_value
                         break
@@ -304,6 +338,44 @@ class StoreVersionService:
             logger.warning(f"Failed to parse Google Play Store HTML: {str(e)}")
 
         return version_info
+
+    def _try_extract_build_number(
+        self, release_notes: str, version: str
+    ) -> Optional[str]:
+        """
+        Try to extract build number from iOS release notes or version info.
+        Many developers include build numbers in their release notes.
+        """
+        if not release_notes:
+            return None
+
+        import re
+
+        # Common patterns for build numbers in release notes
+        build_patterns = [
+            r"[Bb]uild\s*:?\s*(\d+)",
+            r"[Bb]uild\s*[Nn]umber\s*:?\s*(\d+)",
+            r"[Bb]uild\s*[Vv]ersion\s*:?\s*(\d+)",
+            r"\([Bb]uild\s*(\d+)\)",
+            r"[Vv]ersion\s*" + re.escape(version) + r"\s*\((\d+)\)",
+            r"[Vv]" + re.escape(version) + r"\s*\((\d+)\)",
+        ]
+
+        for pattern in build_patterns:
+            match = re.search(pattern, release_notes, re.IGNORECASE)
+            if match:
+                try:
+                    build_num = int(match.group(1))
+                    # Reasonable build number validation
+                    if 1 <= build_num <= 999999:
+                        logger.info(
+                            f"Extracted build_number: {build_num} from iOS release notes"
+                        )
+                        return str(build_num)
+                except ValueError:
+                    continue
+
+        return None
 
     def get_alternative_play_store_info(
         self, package_id: str
