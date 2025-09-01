@@ -45,7 +45,18 @@ class StoreVersionService:
 
             # Look for version information in the HTML
             # Google Play uses different patterns, we'll try multiple approaches
-            version_info = self._extract_play_store_version(html_content, package_id)
+            # Extract version information from HTML
+            extracted_info = self._extract_play_store_version(html_content, package_id)
+
+            # Create minimal version info for API response
+            version_info = {
+                "platform": "android",
+                "app_id": package_id,
+                "version_code": extracted_info.get("version_code"),
+                "version_name": extracted_info.get("version_name"),
+                "build_number": None,  # Google Play doesn't provide build numbers
+                "app_name": extracted_info.get("app_name"),
+            }
 
             # Truncate version_name if it's too long for the database
             version_name = version_info.get("version_name")
@@ -56,13 +67,21 @@ class StoreVersionService:
                 )
 
             # Log the successful check
+            # Truncate version_name if it's too long for the database
+            version_name = extracted_info.get("version_name")
+            if version_name and len(version_name) > 200:
+                version_name = version_name[:200]
+                logger.warning(
+                    f"Truncated long Android version name for {package_id}: {extracted_info.get('version_name')}"
+                )
+
             StoreVersionCheck.objects.create(
                 platform="android",
                 app_id=package_id,
                 version_name=version_name,
-                version_code=version_info.get("version_code"),
+                version_code=extracted_info.get("version_code"),
                 status="success",
-                response_data=version_info,
+                response_data=extracted_info,  # Store full extracted data for logging
             )
 
             return version_info, None
@@ -138,7 +157,8 @@ class StoreVersionService:
                 error_msg = f"Bundle ID mismatch. Expected: {bundle_id}, Got: {app_info.get('bundleId')}"
                 logger.warning(error_msg)
 
-            version_info = {
+            # Store full data for database logging
+            full_version_info = {
                 "version_name": app_info.get("version"),
                 "build_number": None,  # iTunes API doesn't provide build numbers
                 "bundle_id": app_info.get("bundleId"),
@@ -153,21 +173,31 @@ class StoreVersionService:
                 "raw_data": app_info,
             }
 
+            # Create minimal version info for API response
+            version_info = {
+                "platform": "ios",
+                "app_id": app_id,
+                "version_code": None,  # iOS doesn't use version codes
+                "version_name": app_info.get("version"),
+                "build_number": None,  # iTunes API doesn't provide build numbers
+                "app_name": app_info.get("trackName"),
+            }
+
             # Truncate version_name if it's too long for the database
-            version_name = version_info["version_name"]
+            version_name = full_version_info["version_name"]
             if version_name and len(version_name) > 200:
                 version_name = version_name[:200]
                 logger.warning(
-                    f"Truncated long iOS version name for {app_id}: {version_info['version_name']}"
+                    f"Truncated long iOS version name for {app_id}: {full_version_info['version_name']}"
                 )
 
             StoreVersionCheck.objects.create(
                 platform="ios",
                 app_id=app_id,
                 version_name=version_name,
-                build_number=version_info.get("build_number"),
+                build_number=full_version_info.get("build_number"),
                 status="success",
-                response_data=version_info,
+                response_data=full_version_info,
             )
 
             return version_info, None
@@ -219,29 +249,47 @@ class StoreVersionService:
             # Try to extract version name using various patterns
             version_patterns = [
                 r'"versionName":"([^"]+)"',
-                r"Current Version[^>]*>([^<]+)<",
-                r"Version[^>]*>([^<]+)<",
-                r">\s*(\d+\.\d+\.\d+)\s*<",
+                r"Current Version[^>]*>([^<]{1,50})<",
+                r"Version[^>]*>([^<]{1,50})<",
+                r">\s*(\d+\.\d+\.?\d*)\s*<",
             ]
 
             for pattern in version_patterns:
                 match = re.search(pattern, html_content, re.IGNORECASE)
                 if match:
-                    version_info["version_name"] = match.group(1).strip()
-                    break
+                    version_value = match.group(1).strip()
+                    # Validate that it looks like a version number and isn't HTML
+                    if (
+                        len(version_value) < 100
+                        and not "<" in version_value
+                        and not ">" in version_value
+                        and (
+                            re.match(r"^\d+(\.\d+)*$", version_value)
+                            or any(char.isdigit() for char in version_value)
+                        )
+                    ):
+                        version_info["version_name"] = version_value
+                        break
 
             # Try to extract app name
             app_name_patterns = [
                 r'"name":"([^"]+)"',
-                r"<title>([^<]+) - Google Play</title>",
-                r'data-track-click="app-name">([^<]+)</span>',
+                r"<title>([^<]{1,100}) - Google Play</title>",
+                r'data-track-click="app-name">([^<]{1,100})</span>',
             ]
 
             for pattern in app_name_patterns:
                 match = re.search(pattern, html_content, re.IGNORECASE)
                 if match:
-                    version_info["app_name"] = match.group(1).strip()
-                    break
+                    app_name_value = match.group(1).strip()
+                    # Validate that it's not HTML or excessively long
+                    if (
+                        len(app_name_value) < 200
+                        and not "<script" in app_name_value.lower()
+                        and not "javascript" in app_name_value.lower()
+                    ):
+                        version_info["app_name"] = app_name_value
+                        break
 
             # Try to extract last updated date
             updated_patterns = [r"Updated[^>]*>([^<]+)<", r"Last updated[^>]*>([^<]+)<"]
