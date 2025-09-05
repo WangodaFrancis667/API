@@ -1,8 +1,21 @@
 services:
+  postgres:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: afrobuy_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   django:
     build: .
     container_name: django_app
-    command: gunicorn main.wsgi:application --bind 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && gunicorn main.wsgi:application --bind 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
@@ -11,6 +24,13 @@ services:
       - .env
     depends_on:
       - redis
+      - postgres
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check", "--database", "default"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7
@@ -27,8 +47,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - django
+      django:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
 
   celery_beat:
     build: .
@@ -39,5 +63,12 @@ services:
     env_file:
       - .env
     depends_on:
-      - redis
-      - django
+      django:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_started
+
+volumes:
+  postgres_data:
