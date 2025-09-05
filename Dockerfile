@@ -13,7 +13,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
 build-essential \
 libpq-dev \
-default-libmysqlclient-dev \
 libjpeg-dev \
 zlib1g-dev \
 && rm -rf /var/lib/apt/lists/*
@@ -39,7 +38,6 @@ WORKDIR /app
 # Only runtime libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
 libpq5 \
-default-libmysqlclient-dev \
 libjpeg62-turbo \
 zlib1g \
 && rm -rf /var/lib/apt/lists/*
