@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
+    "django_celery_beat",
     # local apps
     "accounts",
     "APIHealth",
@@ -284,7 +285,7 @@ SIMPLE_JWT = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+        "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/1"),
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
         "KEY_PREFIX": "afrobuy",
         "TIMEOUT": 300,  # 5 minutes default timeout
@@ -299,8 +300,8 @@ SESSION_CACHE_ALIAS = "default"
 CACHE_TTL = 60 * 15  # 15 minutes
 
 # Celery (Redis broker & backend)
-CELERY_BROKER_URL = "redis://127.0.0.1:6379/2"
-CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/3"
+CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_RESULT_BACKEND = "redis://redis:6379/0"
 CELERY_TASK_ALWAYS_EAGER = (
     False  # make True for local debugging if you want sync behavior
 )
